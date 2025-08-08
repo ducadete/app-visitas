@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestão de Pacientes Mobile</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+        :root {
+            --primary-color: #0056b3;
+            --primary-light: #e7f3ff;
+            --secondary-color: #28a745;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+            --warning-color: #ffc107;
+            --grey-light: #f8f9fa;
+            --grey-medium: #dee2e6;
+            --grey-dark: #6c757d;
+            --text-color: #333;
+            --bg-color: #f0f2f5;
+        }
+
+        /* --- Reset Básico e Configurações Globais --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* --- Tela de Login --- */
+        #login-view {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 20px;
+            background-color: var(--primary-color);
+        }
+        .login-box {
+            width: 100%;
+            max-width: 320px;
+            padding: 30px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .login-box h1 {
+            color: var(--primary-color);
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+        .login-box .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .login-box input {
+             width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid var(--grey-medium);
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        #login-error {
+            color: var(--danger-color);
+            margin-top: 15px;
+            font-size: 14px;
+            height: 20px;
+        }
+
+
+        /* --- Estrutura Principal e Navegação de Views --- */
+        .main-container {
+            display: none; /* Começa escondido */
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .view {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease-in-out;
+            background-color: var(--bg-color);
+        }
+
+        #list-view {
+            transform: translateX(0);
+            z-index: 10;
+        }
+
+        #details-view {
+            transform: translateX(100%);
+            z-index: 20;
+        }
+
+        .main-container.show-details #list-view {
+            transform: translateX(-100%);
+        }
+
+        .main-container.show-details #details-view {
+            transform: translateX(0);
+        }
+
+        /* --- Cabeçalho --- */
+        .main-header {
+            background-color: #fff;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--grey-medium);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .main-header h1 {
+            margin: 0;
+            font-size: 18px;
+            color: var(--primary-color);
+        }
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            color: var(--grey-dark);
+        }
+
+        /* --- Botões --- */
+        .btn {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+            text-align: center;
+            width: 100%;
+        }
+        .btn:disabled { background-color: var(--grey-medium); cursor: not-allowed; }
+        .btn-success { background-color: var(--secondary-color); }
+        .btn-info { background-color: var(--info-color); }
+        .btn-danger { background-color: var(--danger-color); }
+        .btn-primary { background-color: var(--primary-color); }
+
+        /* --- View da Lista de Pacientes --- */
+        .list-controls {
+            padding: 12px;
+            background-color: #fff;
+            border-bottom: 1px solid var(--grey-medium);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .list-controls input, .list-controls select {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid var(--grey-medium);
+            border-radius: 8px;
+        }
+        .team-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--grey-medium);
+            background-color: #fff;
+        }
+        .tab {
+            flex-grow: 1;
+            padding: 14px 8px;
+            text-align: center;
+            cursor: pointer;
+            color: var(--grey-dark);
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+        #patient-list {
+            list-style: none;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        #patient-list li {
+            padding: 16px;
+            border-bottom: 1px solid var(--grey-medium);
+            cursor: pointer;
+            background-color: #fff;
+        }
+        #patient-list li .patient-name { font-weight: 700; font-size: 16px; }
+        #patient-list li .patient-status { font-size: 14px; color: var(--grey-dark); margin-top: 4px; }
+        #patient-list li.overdue .patient-name { color: var(--danger-color); }
+        .fab-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 15;
+        }
+        .fab {
+            background-color: var(--secondary-color);
+            color: white;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            font-size: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+
+        /* --- View de Detalhes do Paciente --- */
+        #details-view .main-header h1 { font-size: 16px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+        #details-panel {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        #details-placeholder { display: flex; justify-content: center; align-items: center; height: 100%; color: var(--grey-dark); font-size: 18px; text-align: center; }
+        .patient-card { background-color: #fff; border-radius: 12px; padding: 16px; }
+        .card-header { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--grey-medium); }
+        .card-header h3 { font-size: 20px; margin-bottom: 8px; }
+        .overdue-alert { color: var(--danger-color); font-weight: bold; font-size: 14px; }
+        .card-section { margin-bottom: 20px; }
+        .card-section h4 { font-size: 14px; text-transform: uppercase; font-weight: 700; color: var(--primary-color); margin-bottom: 8px; }
+        .card-section p, .tag-container { line-height: 1.6; }
+        .grid-2-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .visits-section h4, .attachments-section h4 { display: flex; justify-content: space-between; align-items: center; }
+        .visits-section .btn, .attachments-section .btn-label { font-size: 14px; padding: 8px 12px; }
+        #visits-list, #attachments-list { list-style: none; margin-top: 10px; }
+        .visit-item, .attachment-item { background-color: var(--grey-light); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+        .visit-item { border-left: 4px solid var(--info-color); }
+        .attachment-item { border-left: 4px solid var(--warning-color); display: flex; justify-content: space-between; align-items: center; }
+        .attachment-item a { text-decoration: none; color: var(--primary-color); font-weight: 500; }
+        .visit-header { display: flex; justify-content: space-between; font-weight: 700; }
+        .visit-details { margin-top: 8px; font-size: 14px; }
+
+        /* --- Componente de Tags --- */
+        .tag-container { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag-item { background-color: var(--primary-color); color: white; padding: 5px 12px; border-radius: 16px; font-size: 14px; }
+
+        /* --- Modal --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.3s ease-in-out;
+        }
+        .modal-overlay.visible { transform: translateY(0); }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: #fff;
+            border-bottom: 1px solid var(--grey-medium);
+            flex-shrink: 0;
+        }
+        .modal-header h2 { font-size: 18px; }
+        .modal-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
+        .form-group { display: flex; flex-direction: column; margin-bottom: 16px; }
+        .form-group label { margin-bottom: 8px; font-weight: 500; font-size: 14px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid var(--grey-medium);
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        .form-group textarea { min-height: 80px; }
+        .modal-footer {
+            padding: 16px;
+            background-color: #fff;
+            border-top: 1px solid var(--grey-medium);
+            display: flex;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .tag-input-container .tag-container {
+             padding: 8px; border: 1px solid var(--grey-medium); border-radius: 8px; min-height: 48px;
+        }
+        .tag-input-container .tag-item { position: relative; padding-right: 28px; }
+        .tag-input-container .remove-tag { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); cursor: pointer; font-weight: bold; }
+        .tag-input-container input { margin-top: 8px; }
+
+        /* --- Notificações --- */
+        .notification-bell { position: relative; }
+        .bell-icon { width: 24px; height: 24px; }
+        .notification-badge {
+            position: absolute;
+            top: -4px;
+            right: -6px;
+            background-color: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 11px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            border: 2px solid white;
+        }
+        #notification-panel {
+            position: absolute;
+            top: 55px;
+            right: 10px;
+            width: calc(100% - 20px);
+            max-width: 320px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid var(--grey-medium);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            z-index: 1100;
+        }
+        .notification-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .notification-item:hover { background-color: var(--grey-light); }
+        .notification-item p { margin: 0; font-size: 14px; }
+        .notification-item .patient-name { font-weight: bold; }
+        .notification-item .overdue-date { font-size: 12px; color: var(--danger-color); }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    
+    <!-- TELA DE LOGIN -->
+    <div id="login-view">
+        <div class="login-box">
+            <h1>Acesso Restrito</h1>
+            <div class="form-group">
+                <label for="username">Usuário</label>
+                <input type="text" id="username" placeholder="Digite o nome de usuário">
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" placeholder="Digite sua senha">
+            </div>
+            <button id="login-btn" class="btn btn-primary">Entrar</button>
+            <p id="login-error"></p>
+        </div>
+    </div>
+
+
+    <div id="main-container" class="main-container">
+
+        <!-- VIEW DA LISTA DE PACIENTES -->
+        <div id="list-view" class="view">
+            <header class="main-header">
+                <h1>Acompanhamento</h1>
+                <div class="header-actions">
+                    <button id="notification-bell" class="btn-icon notification-bell">
+                        <svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.5V11C18 7.13 14.87 4 11 4S4 7.13 4 11V16.5L2 18.5V19.5H20V18.5L18 16.5ZM11 22C12.1 22 13 21.1 13 20H9C9 21.1 9.9 22 11 22Z"/></svg>
+                        <div id="notification-badge" class="notification-badge hidden">0</div>
+                    </button>
+                    <button id="more-options-btn" class="btn-icon">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                    </button>
+                </div>
+            </header>
+            
+            <div id="notification-panel" class="hidden"></div>
+
+            <nav class="team-tabs">
+                <div class="tab active" data-team="71">Equipe 71</div>
+                <div class="tab" data-team="72">Equipe 72</div>
+                <div class="tab" data-team="76">Equipe 76</div>
+            </nav>
+
+            <div class="list-controls">
+                <input type="search" id="search-input" placeholder="Buscar por nome, CNS, telefone...">
+                <select id="filter-select">
+                    <option value="all">Filtrar por Visita...</option>
+                    <option value="overdue">Visitas Atrasadas</option>
+                    <option value="this_month">Próxima Visita (este mês)</option>
+                    <option value="next_month">Próxima Visita (próximo mês)</option>
+                    <option value="no_next_visit">Sem Próxima Visita</option>
+                </select>
+                <select id="filter-microarea-select">
+                    <option value="all">Filtrar por Microárea...</option>
+                </select>
+            </div>
+
+            <ul id="patient-list">
+                 <li id="list-placeholder" style="text-align:center; color: var(--grey-dark); padding: 20px;">Conectando ao banco de dados...</li>
+            </ul>
+
+            <div class="fab-container">
+                <button id="add-patient-btn" class="fab" disabled>+</button>
+            </div>
+        </div>
+
+        <!-- VIEW DE DETALHES DO PACIENTE -->
+        <div id="details-view" class="view">
+            <header class="main-header">
+                 <button id="back-to-list-btn" class="btn-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                 </button>
+                 <h1 id="details-header-title">Detalhes do Paciente</h1>
+                 <div class="header-actions">
+                    <button id="edit-patient-btn" class="btn-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                     <button id="delete-patient-btn" class="btn-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                 </div>
+            </header>
+            <main class="details-panel" id="details-panel">
+                <div id="patient-card-container"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="patient-modal" class="modal-overlay"></div>
+    <div id="visit-modal" class="modal-overlay"></div>
+    <div id="more-options-modal" class="modal-overlay"></div>
+
+    <script type="module">
+        // Importações do Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, deleteDoc, query, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // --- Elementos da UI ---
+        const loginView = document.getElementById('login-view');
+        const mainContainer = document.getElementById('main-container');
+        const loginBtn = document.getElementById('login-btn');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const loginError = document.getElementById('login-error');
+
+        const patientListEl = document.getElementById('patient-list');
+        const listPlaceholder = document.getElementById('list-placeholder');
+        const teamTabs = document.querySelector('.team-tabs');
+        const patientCardContainer = document.getElementById('patient-card-container');
+        const addPatientBtn = document.getElementById('add-patient-btn');
+        const searchInput = document.getElementById('search-input');
+        const filterSelect = document.getElementById('filter-select');
+        const filterMicroareaSelect = document.getElementById('filter-microarea-select');
+        const notificationBell = document.getElementById('notification-bell');
+        const notificationBadge = document.getElementById('notification-badge');
+        const notificationPanel = document.getElementById('notification-panel');
+        const patientModalContainer = document.getElementById('patient-modal');
+        const visitModalContainer = document.getElementById('visit-modal');
+        const moreOptionsModalContainer = document.getElementById('more-options-modal');
+        const backToListBtn = document.getElementById('back-to-list-btn');
+        const detailsHeaderTitle = document.getElementById('details-header-title');
+        const editPatientBtn = document.getElementById('edit-patient-btn');
+        const deletePatientBtn = document.getElementById('delete-patient-btn');
+        const moreOptionsBtn = document.getElementById('more-options-btn');
+
+        // --- Variáveis de Estado e Firebase ---
+        let allPatients = [];
+        let currentTeam = '71';
+        let selectedPatientId = null;
+        let db, auth, storage, appId;
+        let unsubscribeFromPatients;
+        let firebaseInitialized = false;
+
+        // --- Bases de Dados para Sugestões ---
+        const remumeSuggestions = ['Losartana', 'Hidroclorotiazida', 'AAS', 'Metformina', 'Glibenclamida', 'Insulina NPH', 'Omeprazol', 'Sinvastatina', 'Paracetamol', 'Dipirona'];
+        const comorbiditySuggestions = ['Hipertensão Arterial (HAS)', 'Diabetes Mellitus (DM)', 'DPOC', 'Insuficiência Cardíaca (ICC)', 'Doença Renal Crônica (DRC)', 'Sequela de AVC', 'Demência / Alzheimer', 'Depressão'];
+
+        // --- Funções de Renderização (UI) ---
+        function applyFiltersAndRenderList() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filterValue = filterSelect.value;
+            const microAreaFilter = filterMicroareaSelect.value;
+
+            let filteredPatients = allPatients.filter(p => p.team === currentTeam);
+
+            if (searchTerm) {
+                filteredPatients = filteredPatients.filter(p =>
+                    p.name?.toLowerCase().includes(searchTerm) ||
+                    p.cartaoSus?.includes(searchTerm) ||
+                    p.phone?.includes(searchTerm)
+                );
+            }
+            
+            if (microAreaFilter !== 'all') {
+                filteredPatients = filteredPatients.filter(p => p.microArea === microAreaFilter);
+            }
+
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            if (filterValue === 'overdue') {
+                filteredPatients = filteredPatients.filter(p => p.nextVisit && new Date(p.nextVisit + 'T00:00:00') < now);
+            } else if (filterValue === 'this_month') {
+                filteredPatients = filteredPatients.filter(p => {
+                    if (!p.nextVisit) return false;
+                    const nextVisitDate = new Date(p.nextVisit + 'T00:00:00');
+                    return nextVisitDate.getMonth() === currentMonth && nextVisitDate.getFullYear() === currentYear;
+                });
+            } else if (filterValue === 'next_month') {
+                filteredPatients = filteredPatients.filter(p => {
+                    if (!p.nextVisit) return false;
+                    const nextVisitDate = new Date(p.nextVisit + 'T00:00:00');
+                    const nextMonth = (currentMonth + 1) % 12;
+                    const yearForNextMonth = nextMonth === 0 ? currentYear + 1 : currentYear;
+                    return nextVisitDate.getMonth() === nextMonth && nextVisitDate.getFullYear() === yearForNextMonth;
+                });
+            } else if (filterValue === 'no_next_visit') {
+                filteredPatients = filteredPatients.filter(p => !p.nextVisit);
+            }
+
+            renderPatientList(filteredPatients);
+        }
+        
+        function renderPatientList(patientsToRender) {
+            patientListEl.innerHTML = '';
+            listPlaceholder.classList.add('hidden');
+
+            if (patientsToRender.length === 0) {
+                listPlaceholder.textContent = 'Nenhum paciente encontrado.';
+                listPlaceholder.classList.remove('hidden');
+                patientListEl.appendChild(listPlaceholder);
+                return;
+            }
+            patientsToRender.forEach(p => {
+                const li = document.createElement('li');
+                li.dataset.id = p.id;
+                li.innerHTML = `<div class="patient-name">${p.name}</div><div class="patient-status">${p.status || 'Sem status'}</div>`;
+                
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                if (p.nextVisit && new Date(p.nextVisit + 'T00:00:00') < now) {
+                    li.classList.add('overdue');
+                }
+
+                li.addEventListener('click', () => handleSelectPatient(p.id));
+                patientListEl.appendChild(li);
+            });
+        }
+
+        function renderPatientDetails(patientId) {
+            const patient = allPatients.find(p => p.id === patientId);
+            if (!patient) {
+                handleDeselectPatient();
+                return;
+            }
+            
+            detailsHeaderTitle.textContent = patient.name;
+
+            let overdueHtml = '';
+            if (patient.nextVisit) {
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                const nextVisitDate = new Date(patient.nextVisit + 'T00:00:00');
+                if (nextVisitDate < now) {
+                    const diffTime = Math.abs(now - nextVisitDate);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    overdueHtml = `<p class="overdue-alert">Visita atrasada há ${diffDays} dia(s)</p>`;
+                }
+            }
+
+            const renderTags = (tags) => tags && tags.length > 0 ? tags.map(t => `<span class="tag-item">${t}</span>`).join('') : '<p>Nenhum item.</p>';
+            
+            const visitsHtml = patient.visits && patient.visits.length > 0 ? patient.visits.sort((a,b) => new Date(b.visitDate) - new Date(a.visitDate)).map(visit => `
+                <li class="visit-item">
+                    <div class="visit-header">
+                        <span>${new Date(visit.visitDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                        <strong>${visit.professional}</strong>
+                    </div>
+                    <p class="visit-details">Próxima por: ${visit.nextProfessional || 'N/D'} em ${visit.nextVisitDate ? new Date(visit.nextVisitDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</p>
+                </li>
+            `).join('') : '<p>Nenhuma visita registrada.</p>';
+            
+            const attachmentsHtml = patient.attachments && patient.attachments.length > 0 ? patient.attachments.map((file, index) => `
+                <li class="attachment-item">
+                    <a href="${file.url}" target="_blank">${file.name}</a>
+                    <button class="btn-icon" style="color: var(--danger-color);" onclick="window.handleDeleteAttachment('${patient.id}', ${index})">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </li>
+            `).join('') : '<p>Nenhum anexo.</p>';
+
+            patientCardContainer.innerHTML = `
+                <div class="patient-card">
+                    <div class="card-header">
+                        <h3>${patient.name}</h3>
+                        ${overdueHtml}
+                    </div>
+                    <div class="card-body">
+                        <section class="card-section"><h4>Informações Básicas</h4>
+                            <div class="grid-2-cols">
+                                <p><strong>Equipe:</strong> ${patient.team || 'N/A'}</p>
+                                <p><strong>Status:</strong> ${patient.status || 'N/A'}</p>
+                                <p><strong>CNS:</strong> ${patient.cartaoSus || 'N/A'}</p>
+                                <p><strong>Telefone:</strong> ${patient.phone || 'N/A'}</p>
+                            </div>
+                        </section>
+                        <section class="card-section"><h4>Localização</h4>
+                            <p><strong>Endereço:</strong> ${patient.address || 'N/A'}</p>
+                            <div class="grid-2-cols" style="margin-top: 8px;">
+                                <p><strong>Área:</strong> ${patient.area || 'N/A'}</p>
+                                <p><strong>Microárea:</strong> ${patient.microArea || 'N/A'}</p>
+                                <p><strong>Família:</strong> ${patient.familia || 'N/A'}</p>
+                                <p><strong>ACS:</strong> ${patient.agente || 'N/A'}</p>
+                            </div>
+                        </section>
+                        <section class="card-section"><h4>Cuidador</h4><p>${patient.caregiverName || 'N/A'}</p></section>
+                        <section class="card-section"><h4>Motivo do Cadastro</h4><p>${patient.reason || 'N/A'}</p></section>
+                        <section class="card-section"><h4>Comorbidades</h4><div class="tag-container">${renderTags(patient.comorbidity)}</div></section>
+                        <section class="card-section"><h4>Medicações</h4><div class="tag-container">${renderTags(patient.medications)}</div></section>
+                        <section class="card-section"><h4>Acompanhamento</h4>
+                            <div class="grid-2-cols">
+                                <p><strong>Periodicidade:</strong> ${patient.visitFrequency || 'N/A'}</p>
+                                <p><strong>Última Visita:</strong> ${patient.lastVisit ? new Date(patient.lastVisit + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                <p><strong>Próxima Visita:</strong> ${patient.nextVisit ? new Date(patient.nextVisit + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                <p><strong>Profissional:</strong> ${patient.nextVisitProfessional || 'N/A'}</p>
+                            </div>
+                        </section>
+                        <hr style="margin: 20px 0;">
+                        <section class="card-section visits-section">
+                            <h4><span>Histórico de Visitas</span><button class="btn btn-info" onclick="window.openVisitModal('${patient.id}')">+ Visita</button></h4>
+                            <ul id="visits-list">${visitsHtml}</ul>
+                        </section>
+                        <hr style="margin: 20px 0;">
+                        <section class="card-section attachments-section">
+                            <h4><span>Anexos</span>
+                                <label class="btn btn-info btn-label">
+                                    + Anexo
+                                    <input type="file" onchange="window.handleFileUpload(event, '${patient.id}')" style="display: none;">
+                                </label>
+                            </h4>
+                            <ul id="attachments-list">${attachmentsHtml}</ul>
+                        </section>
+                    </div>
+                </div>`;
+        }
+        
+        function updateView() {
+            applyFiltersAndRenderList();
+            updateNotificationBell();
+            
+            if (selectedPatientId) {
+                const patientExists = allPatients.some(p => p.id === selectedPatientId);
+                if (patientExists) {
+                    renderPatientDetails(selectedPatientId);
+                } else {
+                    handleDeselectPatient();
+                }
+            }
+        }
+
+        // --- Manipuladores de Eventos Globais ---
+        function handleSelectPatient(patientId) {
+            selectedPatientId = patientId;
+            mainContainer.classList.add('show-details');
+            renderPatientDetails(patientId);
+        }
+        
+        function handleDeselectPatient() {
+            selectedPatientId = null;
+            mainContainer.classList.remove('show-details');
+            detailsHeaderTitle.textContent = 'Detalhes do Paciente';
+            patientCardContainer.innerHTML = '';
+        }
+
+        teamTabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab') && !e.target.classList.contains('active')) {
+                currentTeam = e.target.dataset.team;
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                handleDeselectPatient();
+                populateMicroAreaFilter();
+                updateView();
+            }
+        });
+
+        backToListBtn.addEventListener('click', handleDeselectPatient);
+        
+        deletePatientBtn.addEventListener('click', () => {
+             if (selectedPatientId && confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita.')) {
+                try {
+                    const patientRef = doc(db, `artifacts/${appId}/public/data/patients`, selectedPatientId);
+                    deleteDoc(patientRef);
+                    handleDeselectPatient(); // Volta para a lista
+                } catch (error) {
+                    console.error("Erro ao excluir paciente: ", error);
+                    alert("Falha ao excluir paciente.");
+                }
+            }
+        });
+        
+        editPatientBtn.addEventListener('click', () => {
+            if(selectedPatientId) {
+                window.openPatientModal(true, selectedPatientId);
+            }
+        });
+
+        // --- Lógica dos Modais ---
+        const createTagInput = (id, label, suggestions, currentTags = []) => {
+            const suggestionsHtml = suggestions.map(s => `<option value="${s}"></option>`).join('');
+            
+            return `
+                <div class="form-group tag-input-container">
+                    <label for="${id}-input">${label}</label>
+                    <div id="${id}-tags" class="tag-container"></div>
+                    <input list="${id}-suggestions" id="${id}-input" class="tag-input" placeholder="Selecione ou digite e tecle Enter">
+                    <datalist id="${id}-suggestions">${suggestionsHtml}</datalist>
+                </div>
+            `;
+        };
+
+        const setupTagInput = (id, currentTags) => {
+            const container = document.getElementById(`${id}-tags`);
+            const input = document.getElementById(`${id}-input`);
+            
+            const render = (tags) => {
+                container.innerHTML = tags.map((tag, index) => `<span class="tag-item">${tag}<span class="remove-tag" data-index="${index}">&times;</span></span>`).join('');
+            };
+            
+            render(currentTags);
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && input.value.trim() !== '') {
+                    e.preventDefault();
+                    if (!currentTags.includes(input.value.trim())) {
+                        currentTags.push(input.value.trim());
+                        render(currentTags);
+                    }
+                    input.value = '';
+                }
+            });
+            
+            container.addEventListener('click', (e) => {
+                if(e.target.classList.contains('remove-tag')) {
+                    const index = parseInt(e.target.dataset.index, 10);
+                    currentTags.splice(index, 1);
+                    render(currentTags);
+                }
+            });
+        };
+
+        window.openPatientModal = (isEditing = false, patientId = null) => {
+            const patient = isEditing ? allPatients.find(p => p.id === patientId) : null;
+            const comorbidityTags = patient?.comorbidity || [];
+            const medicationTags = patient?.medications || [];
+
+            patientModalContainer.innerHTML = `
+                <div class="modal-header">
+                    <h2>${isEditing ? 'Editar Paciente' : 'Novo Paciente'}</h2>
+                    <button class="btn-icon" onclick="window.closePatientModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="patient-id" value="${patient?.id || ''}">
+                    <div class="form-group"><label>Nome Completo</label><input id="name" value="${patient?.name || ''}" required></div>
+                    <div class="form-group"><label>Equipe</label><select id="team">${['71', '72', '76'].map(t => `<option value="${t}" ${ (patient?.team || currentTeam) === t ? 'selected' : ''}>Equipe ${t}</option>`).join('')}</select></div>
+                    <div class="form-group"><label>Cartão SUS</label><input id="cartaoSus" value="${patient?.cartaoSus || ''}"></div>
+                    <div class="form-group"><label>Telefone</label><input id="phone" type="tel" value="${patient?.phone || ''}"></div>
+                    <div class="form-group"><label>Endereço</label><input id="address" value="${patient?.address || ''}"></div>
+                    <div class="form-group"><label>Área</label><input id="area" value="${patient?.area || ''}"></div>
+                    <div class="form-group"><label>Microárea</label><input id="microArea" value="${patient?.microArea || ''}"></div>
+                    <div class="form-group"><label>Família</label><input id="familia" value="${patient?.familia || ''}"></div>
+                    <div class="form-group"><label>Agente Comunitário</label><input id="agente" value="${patient?.agente || ''}"></div>
+                    <div class="form-group"><label>Cuidador</label><input id="caregiverName" value="${patient?.caregiverName || ''}"></div>
+                    <div class="form-group"><label>Status</label><select id="status">${['Ativo', 'Alta', 'Internado', 'Óbito'].map(s => `<option value="${s}" ${patient?.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+                    <div class="form-group"><label>Motivo do Cadastro</label><textarea id="reason">${patient?.reason || ''}</textarea></div>
+                    ${createTagInput('comorbidity', 'Comorbidades', comorbiditySuggestions)}
+                    ${createTagInput('medications', 'Medicações', remumeSuggestions)}
+                    <div class="form-group"><label>Periodicidade da Visita</label><input id="visitFrequency" value="${patient?.visitFrequency || ''}"></div>
+                    <div class="form-group"><label>Última Visita</label><input type="date" id="lastVisit" value="${patient?.lastVisit || ''}"></div>
+                    <div class="form-group"><label>Próxima Visita</label><input type="date" id="nextVisit" value="${patient?.nextVisit || ''}"></div>
+                    <div class="form-group"><label>Profissional (Próxima Visita)</label><input id="nextVisitProfessional" value="${patient?.nextVisitProfessional || ''}"></div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="window.handleSavePatient()" class="btn btn-success">Salvar</button>
+                </div>`;
+
+            setupTagInput('comorbidity', comorbidityTags);
+            setupTagInput('medications', medicationTags);
+            patientModalContainer.classList.add('visible');
+        };
+        
+        window.closePatientModal = () => patientModalContainer.classList.remove('visible');
+        
+        window.handleSavePatient = async () => {
+            const id = document.getElementById('patient-id').value;
+            const isNewPatient = !id;
+            const patientData = {
+                name: document.getElementById('name').value,
+                team: document.getElementById('team').value,
+                cartaoSus: document.getElementById('cartaoSus').value,
+                phone: document.getElementById('phone').value,
+                address: document.getElementById('address').value,
+                area: document.getElementById('area').value,
+                microArea: document.getElementById('microArea').value,
+                familia: document.getElementById('familia').value,
+                agente: document.getElementById('agente').value,
+                caregiverName: document.getElementById('caregiverName').value,
+                status: document.getElementById('status').value,
+                reason: document.getElementById('reason').value,
+                visitFrequency: document.getElementById('visitFrequency').value,
+                lastVisit: document.getElementById('lastVisit').value,
+                nextVisit: document.getElementById('nextVisit').value,
+                nextVisitProfessional: document.getElementById('nextVisitProfessional').value,
+                comorbidity: Array.from(document.querySelectorAll('#comorbidity-tags .tag-item')).map(t => t.innerText.slice(0, -1).trim()),
+                medications: Array.from(document.querySelectorAll('#medications-tags .tag-item')).map(t => t.innerText.slice(0, -1).trim())
+            };
+            
+            if (isNewPatient) {
+                patientData.createdAt = new Date().toISOString();
+            }
+
+            try {
+                let savedPatientId = id;
+                if (isNewPatient) {
+                    const collectionRef = collection(db, `artifacts/${appId}/public/data/patients`);
+                    const newDocRef = await addDoc(collectionRef, patientData);
+                    savedPatientId = newDocRef.id;
+                } else {
+                    const patientRef = doc(db, `artifacts/${appId}/public/data/patients`, id);
+                    await setDoc(patientRef, patientData, { merge: true });
+                }
+                
+                closePatientModal();
+                
+                if (currentTeam !== patientData.team) {
+                    currentTeam = patientData.team;
+                    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.team === currentTeam));
+                    populateMicroAreaFilter();
+                    updateView();
+                }
+                
+                handleSelectPatient(savedPatientId);
+
+            } catch (error) {
+                console.error("Erro ao salvar paciente: ", error);
+                alert("Falha ao salvar paciente.");
+            }
+        };
+        
+        window.openVisitModal = (patientId) => {
+            visitModalContainer.innerHTML = `
+                <div class="modal-header">
+                    <h2>Registrar Visita</h2>
+                    <button class="btn-icon" onclick="window.closeVisitModal()">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="visit-patient-id" value="${patientId}">
+                    <div class="form-group"><label>Data da Visita</label><input type="date" id="visitDate" required></div>
+                    <div class="form-group"><label>Profissional(is) da Visita</label><input type="text" id="professional" required></div>
+                    <div class="form-group"><label>Data da Próxima Visita</label><input type="date" id="nextVisitDateForVisit"></div>
+                    <div class="form-group"><label>Quem Fará a Próxima Visita?</label><input type="text" id="nextProfessionalForVisit"></div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="window.handleSaveVisit()" class="btn btn-success">Salvar Visita</button>
+                </div>`;
+            visitModalContainer.classList.add('visible');
+        };
+        window.closeVisitModal = () => visitModalContainer.classList.remove('visible');
+        
+        window.handleSaveVisit = async () => {
+            const patientId = document.getElementById('visit-patient-id').value;
+            const patient = allPatients.find(p => p.id === patientId);
+            if (!patient) return;
+
+            const newVisit = {
+                visitId: `v${Date.now()}`,
+                visitDate: document.getElementById('visitDate').value,
+                professional: document.getElementById('professional').value,
+                nextVisitDate: document.getElementById('nextVisitDateForVisit').value,
+                nextProfessional: document.getElementById('nextProfessionalForVisit').value,
+            };
+            
+            if (!newVisit.visitDate || !newVisit.professional) {
+                alert('Por favor, preencha a data da visita e o profissional.');
+                return;
+            }
+
+            const updatedVisits = [...(patient.visits || []), newVisit];
+            const patientDataToUpdate = {
+                visits: updatedVisits,
+                lastVisit: newVisit.visitDate,
+                nextVisit: newVisit.nextVisitDate || patient.nextVisit,
+                nextVisitProfessional: newVisit.nextProfessional || patient.nextVisitProfessional
+            };
+
+            try {
+                const patientRef = doc(db, `artifacts/${appId}/public/data/patients`, patientId);
+                await setDoc(patientRef, patientDataToUpdate, { merge: true });
+                closeVisitModal();
+            } catch(error) {
+                console.error("Erro ao salvar visita:", error);
+                alert("Falha ao salvar a visita.");
+            }
+        };
+
+        window.openMoreOptionsModal = () => {
+            moreOptionsModalContainer.innerHTML = `
+                <div class="modal-header">
+                    <h2>Mais Opções</h2>
+                    <button class="btn-icon" onclick="window.closeMoreOptionsModal()">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <h4>Importar Pacientes</h4>
+                    <p style="font-size: 14px; color: var(--grey-dark); margin-bottom: 10px;">Cole os dados abaixo. Cada paciente deve ter 4 linhas: Nome, Telefone, CNS, Endereço. Separe pacientes com uma linha em branco.</p>
+                    <textarea id="import-text-area" rows="8" style="width: 100%; font-size: 14px;" placeholder="NOME DO PACIENTE\nTELEFONE\nCARTÃO SUS\nENDEREÇO..."></textarea>
+                    <button onclick="window.handleImport()" class="btn btn-info" style="margin-top: 10px;">Importar</button>
+                    <hr style="margin: 20px 0;">
+                    <h4>Relatórios e Exportação</h4>
+                    <div class="form-group">
+                        <label>Exportar por intervalo (Próxima Visita)</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="date" id="export-start-date" style="width: 50%;">
+                            <input type="date" id="export-end-date" style="width: 50%;">
+                        </div>
+                        <button onclick="window.handleExport('date_range')" class="btn btn-primary" style="margin-top: 10px;">Exportar por Data</button>
+                    </div>
+                     <div class="form-group">
+                        <label>Exportar pacientes com visitas atrasadas</label>
+                        <button onclick="window.handleExport('overdue')" class="btn btn-danger" style="margin-top: 10px;">Exportar Atrasados</button>
+                    </div>
+                    <hr style="margin: 20px 0;">
+                    <button id="logout-btn" class="btn btn-danger">Sair do Sistema</button>
+                </div>`;
+            moreOptionsModalContainer.classList.add('visible');
+            document.getElementById('logout-btn').addEventListener('click', handleLogout);
+        };
+        window.closeMoreOptionsModal = () => moreOptionsModalContainer.classList.remove('visible');
+        
+        window.handleImport = async () => {
+            const text = document.getElementById('import-text-area').value.trim();
+            const patientBlocks = text.split(/\n\s*\n/);
+            let importedCount = 0;
+            
+            const collectionRef = collection(db, `artifacts/${appId}/public/data/patients`);
+            const batch = writeBatch(db);
+            
+            patientBlocks.forEach(block => {
+                const lines = block.trim().split('\n');
+                if (lines.length >= 4) {
+                    const newPatientData = {
+                        name: lines[0].trim(),
+                        phone: lines[1].trim(),
+                        cartaoSus: lines[2].trim(),
+                        address: lines[3].trim(),
+                        team: currentTeam, status: 'Ativo', visits: [], medications: [], comorbidity: [], createdAt: new Date().toISOString()
+                    };
+                    const newPatientRef = doc(collectionRef);
+                    batch.set(newPatientRef, newPatientData);
+                    importedCount++;
+                }
+            });
+
+            if (importedCount > 0) {
+                try {
+                    await batch.commit();
+                    alert(`${importedCount} pacientes importados com sucesso!`);
+                    closeMoreOptionsModal();
+                } catch (error) {
+                    console.error("Erro ao importar em massa:", error);
+                    alert("Falha ao importar pacientes.");
+                }
+            } else {
+                alert('Nenhum paciente válido encontrado no texto. Verifique o formato.');
+            }
+        };
+
+        window.handleExport = (type) => {
+            let dataToExport = [];
+            const teamPatients = allPatients.filter(p => p.team === currentTeam);
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            if (type === 'date_range') {
+                const startDate = document.getElementById('export-start-date').value;
+                const endDate = document.getElementById('export-end-date').value;
+                if (!startDate || !endDate) { alert('Por favor, selecione as datas de início e fim.'); return; }
+                const start = new Date(startDate + 'T00:00:00');
+                const end = new Date(endDate + 'T00:00:00');
+                dataToExport = teamPatients.filter(p => p.nextVisit && new Date(p.nextVisit + 'T00:00:00') >= start && new Date(p.nextVisit + 'T00:00:00') <= end);
+            } else if (type === 'overdue') {
+                dataToExport = teamPatients.filter(p => p.nextVisit && new Date(p.nextVisit + 'T00:00:00') < now);
+            }
+            
+            if (dataToExport.length === 0) { alert('Nenhum paciente encontrado para os critérios selecionados.'); return; }
+            
+            generateAndDownloadCSV(dataToExport, `${type}_equipe_${currentTeam}`);
+            closeMoreOptionsModal();
+        };
+
+        function generateAndDownloadCSV(data, filename) {
+            const headers = ['Nome', 'Telefone', 'CartaoSUS', 'Endereco', 'Equipe', 'Status', 'ProximaVisita', 'ProfissionalProximaVisita'];
+            const csvRows = [headers.join(',')];
+            for (const row of data) {
+                const values = headers.map(header => `"${row[header.charAt(0).toLowerCase() + header.slice(1)] || ''}"`);
+                csvRows.push(values.join(','));
+            }
+            const csvString = csvRows.join('\n');
+            
+            const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // --- Funções Auxiliares ---
+        function populateMicroAreaFilter() {
+            filterMicroareaSelect.innerHTML = '<option value="all">Todas as Microáreas</option>';
+            const teamPatients = allPatients.filter(p => p.team === currentTeam);
+            const microAreas = [...new Set(teamPatients.map(p => p.microArea).filter(ma => ma))];
+            microAreas.sort();
+            microAreas.forEach(ma => {
+                const option = document.createElement('option');
+                option.value = ma;
+                option.textContent = `Microárea ${ma}`;
+                filterMicroareaSelect.appendChild(option);
+            });
+        }
+
+        function updateNotificationBell() {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            
+            const overduePatients = allPatients.filter(p => p.team === currentTeam && p.nextVisit && new Date(p.nextVisit + 'T00:00:00') < now);
+            
+            if (overduePatients.length > 0) {
+                notificationBadge.textContent = overduePatients.length;
+                notificationBadge.classList.remove('hidden');
+            } else {
+                notificationBadge.classList.add('hidden');
+            }
+
+            notificationPanel.innerHTML = '';
+            if (overduePatients.length > 0) {
+                 overduePatients.sort((a,b) => new Date(a.nextVisit) - new Date(b.nextVisit)).forEach(p => {
+                    const item = document.createElement('div');
+                    item.className = 'notification-item';
+                    item.innerHTML = `<p class="patient-name">${p.name}</p><p class="overdue-date">Atrasado desde: ${new Date(p.nextVisit + 'T00:00:00').toLocaleDateString('pt-BR')}</p>`;
+                    item.addEventListener('click', () => {
+                        handleSelectPatient(p.id);
+                        notificationPanel.classList.add('hidden');
+                    });
+                    notificationPanel.appendChild(item);
+                });
+            } else {
+                notificationPanel.innerHTML = '<div class="notification-item"><p>Nenhuma visita atrasada.</p></div>';
+            }
+        }
+        
+        notificationBell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notificationPanel.classList.toggle('hidden');
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!notificationBell.contains(e.target) && !notificationPanel.contains(e.target)) {
+                notificationPanel.classList.add('hidden');
+            }
+        });
+        
+        window.handleFileUpload = async (event, patientId) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const patient = allPatients.find(p => p.id === patientId);
+            if (!patient) return;
+            
+            const filePath = `artifacts/${appId}/public/attachments/${patientId}/${Date.now()}_${file.name}`;
+            const fileRef = ref(storage, filePath);
+
+            try {
+                alert(`Enviando ${file.name}...`);
+                await uploadBytes(fileRef, file);
+                const url = await getDownloadURL(fileRef);
+                
+                const newAttachment = { name: file.name, url: url, path: filePath };
+                const updatedAttachments = [...(patient.attachments || []), newAttachment];
+                
+                const patientRef = doc(db, `artifacts/${appId}/public/data/patients`, patientId);
+                await setDoc(patientRef, { attachments: updatedAttachments }, { merge: true });
+                alert("Anexo enviado com sucesso!");
+            } catch (error) {
+                console.error("Erro no upload:", error);
+                alert("Falha ao enviar arquivo.");
+            }
+        };
+        
+        window.handleDeleteAttachment = async (patientId, index) => {
+            if (!confirm('Tem certeza que deseja excluir este anexo?')) return;
+            
+            const patient = allPatients.find(p => p.id === patientId);
+            if (!patient || !patient.attachments || !patient.attachments[index]) return;
+            
+            const fileToDelete = patient.attachments[index];
+            const fileRef = ref(storage, fileToDelete.path);
+            
+            try {
+                await deleteObject(fileRef);
+                
+                const updatedAttachments = patient.attachments.filter((_, i) => i !== index);
+                const patientRef = doc(db, `artifacts/${appId}/public/data/patients`, patientId);
+                await setDoc(patientRef, { attachments: updatedAttachments }, { merge: true });
+            } catch (error) {
+                console.error("Erro ao excluir anexo:", error);
+                alert("Falha ao excluir anexo.");
+            }
+        };
+
+        // --- Inicialização do Firebase e da Aplicação ---
+        async function initializeFirebase() {
+            if (firebaseInitialized) return;
+            
+            // COLE A SUA CONFIGURAÇÃO AQUI
+            const firebaseConfig = {
+              apiKey: "AIzaSyBhEBowuQVhD1IrrVPlbrP_esEeXrW-se0",
+              authDomain: "visitaacs.firebaseapp.com",
+              projectId: "visitaacs",
+              storageBucket: "visitaacs.appspot.com",
+              messagingSenderId: "433745488238",
+              appId: "1:433745488238:web:c73dfd7bd10db99b14b97f",
+              measurementId: "G-MD8NV9SNTH"
+            };
+            appId = firebaseConfig.projectId;
+
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            storage = getStorage(app);
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    setupRealtimeListener();
+                    addPatientBtn.disabled = false;
+                    firebaseInitialized = true;
+                } else {
+                    try {
+                        await signInAnonymously(auth);
+                    } catch (error) {
+                        console.error("Falha na autenticação:", error);
+                        listPlaceholder.textContent = "Erro de autenticação.";
+                    }
+                }
+            });
+        }
+
+        function setupRealtimeListener() {
+            const collectionRef = collection(db, `artifacts/${appId}/public/data/patients`);
+            const q = query(collectionRef);
+
+            if (unsubscribeFromPatients) unsubscribeFromPatients();
+
+            unsubscribeFromPatients = onSnapshot(q, (querySnapshot) => {
+                allPatients = [];
+                querySnapshot.forEach((doc) => {
+                    allPatients.push({ id: doc.id, ...doc.data() });
+                });
+                listPlaceholder.textContent = 'Selecione um paciente ou cadastre um novo.';
+                populateMicroAreaFilter();
+                updateView();
+            }, (error) => {
+                console.error("Erro ao ouvir atualizações:", error);
+                listPlaceholder.textContent = "Erro ao carregar dados.";
+            });
+        }
+        
+        // --- LÓGICA DE LOGIN ---
+        function handleLogin() {
+            const username = usernameInput.value;
+            const password = passwordInput.value;
+
+            if (username === "USFDUTRA" && password === "Dutra2025") {
+                loginError.textContent = '';
+                loginView.style.display = 'none';
+                mainContainer.style.display = 'flex';
+                initializeFirebase(); // Inicializa o Firebase somente após o login
+            } else {
+                loginError.textContent = 'Usuário ou senha inválidos.';
+            }
+        }
+
+        function handleLogout() {
+            // Simplesmente volta para a tela de login
+            mainContainer.style.display = 'none';
+            loginView.style.display = 'flex';
+            passwordInput.value = '';
+            loginError.textContent = '';
+            closeMoreOptionsModal();
+            handleDeselectPatient();
+        }
+
+        // --- Eventos de UI ---
+        loginBtn.addEventListener('click', handleLogin);
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+
+        searchInput.addEventListener('input', updateView);
+        filterSelect.addEventListener('change', updateView);
+        filterMicroareaSelect.addEventListener('change', updateView);
+        addPatientBtn.addEventListener('click', () => window.openPatientModal(false));
+        moreOptionsBtn.addEventListener('click', window.openMoreOptionsModal);
+
+    </script>
+</body>
+</html>
