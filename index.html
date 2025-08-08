@@ -370,8 +370,8 @@
         <div class="login-box">
             <h1>Acesso Restrito</h1>
             <div class="form-group">
-                <label for="username">Usuário</label>
-                <input type="text" id="username" placeholder="Digite o nome de usuário">
+                <label for="email">E-mail</label>
+                <input type="email" id="email" placeholder="Digite o e-mail da equipe">
             </div>
             <div class="form-group">
                 <label for="password">Senha</label>
@@ -423,7 +423,7 @@
             </div>
 
             <ul id="patient-list">
-                 <li id="list-placeholder" style="text-align:center; color: var(--grey-dark); padding: 20px;">Conectando ao banco de dados...</li>
+                 <li id="list-placeholder" style="text-align:center; color: var(--grey-dark); padding: 20px;">Aguardando login...</li>
             </ul>
 
             <div class="fab-container">
@@ -461,7 +461,7 @@
     <script type="module">
         // Importações do Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, deleteDoc, query, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
@@ -469,7 +469,7 @@
         const loginView = document.getElementById('login-view');
         const mainContainer = document.getElementById('main-container');
         const loginBtn = document.getElementById('login-btn');
-        const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
         const loginError = document.getElementById('login-error');
 
@@ -499,7 +499,6 @@
         let selectedPatientId = null;
         let db, auth, storage, appId;
         let unsubscribeFromPatients;
-        let firebaseInitialized = false;
 
         // --- Bases de Dados para Sugestões ---
         const remumeSuggestions = ['Losartana', 'Hidroclorotiazida', 'AAS', 'Metformina', 'Glibenclamida', 'Insulina NPH', 'Omeprazol', 'Sinvastatina', 'Paracetamol', 'Dipirona'];
@@ -1157,48 +1156,48 @@
             }
         };
 
-        // --- Inicialização do Firebase e da Aplicação ---
-        async function initializeFirebase() {
-            if (firebaseInitialized) return;
-            
-            // COLE A SUA CONFIGURAÇÃO AQUI
-            const firebaseConfig = {
-              apiKey: "AIzaSyBhEBowuQVhD1IrrVPlbrP_esEeXrW-se0",
-              authDomain: "visitaacs.firebaseapp.com",
-              projectId: "visitaacs",
-              storageBucket: "visitaacs.appspot.com",
-              messagingSenderId: "433745488238",
-              appId: "1:433745488238:web:c73dfd7bd10db99b14b97f",
-              measurementId: "G-MD8NV9SNTH"
-            };
-            appId = firebaseConfig.projectId;
+        // --- LÓGICA DE LOGIN E AUTENTICAÇÃO ---
+        
+        async function handleLogin() {
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            loginError.textContent = '';
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Entrando...';
 
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            storage = getStorage(app);
-
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    setupRealtimeListener();
-                    addPatientBtn.disabled = false;
-                    firebaseInitialized = true;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // O onAuthStateChanged vai cuidar de mostrar o app
+            } catch (error) {
+                console.error("Erro de login:", error.code);
+                if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                    loginError.textContent = 'E-mail ou senha inválidos.';
+                } else if (error.code === 'auth/invalid-email') {
+                    loginError.textContent = 'Formato de e-mail inválido.';
                 } else {
-                    try {
-                        await signInAnonymously(auth);
-                    } catch (error) {
-                        console.error("Falha na autenticação:", error);
-                        listPlaceholder.textContent = "Erro de autenticação.";
-                    }
+                    loginError.textContent = 'Ocorreu um erro ao tentar entrar.';
                 }
-            });
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Entrar';
+            }
         }
 
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+                // O onAuthStateChanged vai cuidar de mostrar a tela de login
+            } catch (error) {
+                console.error("Erro ao sair:", error);
+                alert("Ocorreu um erro ao tentar sair.");
+            }
+        }
+        
         function setupRealtimeListener() {
+            if (unsubscribeFromPatients) unsubscribeFromPatients(); // Cancela listener anterior, se houver
+
             const collectionRef = collection(db, `artifacts/${appId}/public/data/patients`);
             const q = query(collectionRef);
-
-            if (unsubscribeFromPatients) unsubscribeFromPatients();
 
             unsubscribeFromPatients = onSnapshot(q, (querySnapshot) => {
                 allPatients = [];
@@ -1214,37 +1213,55 @@
             });
         }
         
-        // --- LÓGICA DE LOGIN ---
-        function handleLogin() {
-            const username = usernameInput.value;
-            const password = passwordInput.value;
+        // --- INICIALIZAÇÃO ---
+        
+        // 1. Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBhEBowuQVhD1IrrVPlbrP_esEeXrW-se0",
+            authDomain: "visitaacs.firebaseapp.com",
+            projectId: "visitaacs",
+            storageBucket: "visitaacs.appspot.com",
+            messagingSenderId: "433745488238",
+            appId: "1:433745488238:web:c73dfd7bd10db99b14b97f",
+            measurementId: "G-MD8NV9SNTH"
+        };
+        appId = firebaseConfig.projectId;
 
-            if (username === "USFDUTRA" && password === "Dutra2025") {
-                loginError.textContent = '';
+        // 2. Inicialização dos serviços
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        storage = getStorage(app);
+
+        // 3. Listener principal de autenticação
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Usuário está logado
                 loginView.style.display = 'none';
                 mainContainer.style.display = 'flex';
-                initializeFirebase(); // Inicializa o Firebase somente após o login
+                addPatientBtn.disabled = false;
+                setupRealtimeListener();
             } else {
-                loginError.textContent = 'Usuário ou senha inválidos.';
+                // Usuário está deslogado
+                mainContainer.style.display = 'none';
+                loginView.style.display = 'flex';
+                addPatientBtn.disabled = true;
+                if (unsubscribeFromPatients) {
+                    unsubscribeFromPatients(); // Para de ouvir os dados
+                    unsubscribeFromPatients = null;
+                }
+                allPatients = []; // Limpa os dados
+                updateView();
             }
-        }
-
-        function handleLogout() {
-            // Simplesmente volta para a tela de login
-            mainContainer.style.display = 'none';
-            loginView.style.display = 'flex';
-            passwordInput.value = '';
-            loginError.textContent = '';
-            closeMoreOptionsModal();
-            handleDeselectPatient();
-        }
+        });
 
         // --- Eventos de UI ---
         loginBtn.addEventListener('click', handleLogin);
         passwordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleLogin();
-            }
+            if (e.key === 'Enter') handleLogin();
+        });
+        emailInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
         });
 
         searchInput.addEventListener('input', updateView);
