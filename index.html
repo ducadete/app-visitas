@@ -504,9 +504,16 @@
         let db, auth, storage, appId;
         let unsubscribeFromPatients;
 
-        // --- Bases de Dados para Sugestões ---
+        // --- Bases de Dados para Sugestões e Seleções ---
         const remumeSuggestions = ['Losartana', 'Hidroclorotiazida', 'AAS', 'Metformina', 'Glibenclamida', 'Insulina NPH', 'Omeprazol', 'Sinvastatina', 'Paracetamol', 'Dipirona'];
         const comorbiditySuggestions = ['Hipertensão Arterial (HAS)', 'Diabetes Mellitus (DM)', 'DPOC', 'Insuficiência Cardíaca (ICC)', 'Doença Renal Crônica (DRC)', 'Sequela de AVC', 'Demência / Alzheimer', 'Depressão'];
+        const agentesPorArea = {
+            '071': ['DAMARIS VASCONI DA SILVA', 'DJEINE GONCALVES DOS SANTOS', 'FRANKLIN ABNER DE LIMA SANTOS', 'GIOVANA RENATA RECUCHE', 'LEANDRO DAVANCO FREIRE', 'MAGDA PAULA PEREIRA DO NASCIMENTO'],
+            '072': ['GIULIA NARCIZO GARCIA', 'ISABELA CRISTINA FLORENTINO', 'RICARDO RUIVO BUSCH', 'VANESSA DOMINGOS BARBOSA', 'VANESSA FRACALOSSI'],
+            '076': ['DAYANE FERNANDA LIMA DA SILVA', 'FABIANA JORGE DA SILVA', 'FERNANDA DE SOUZA FERREIRA', 'BEATRIZ PEREIRA CAMPOS', 'ALESSANDRA REGINA DA SILVA']
+        };
+        const microareaOptions = ['01', '02', '03', '04', '05', '06'];
+
 
         // --- Funções de Renderização (UI) ---
         function applyFiltersAndRenderList() {
@@ -569,7 +576,7 @@
             patientsToRender.forEach(p => {
                 const li = document.createElement('li');
                 li.dataset.id = p.id;
-                li.innerHTML = `<div class="patient-name">${p.name}</div><div class="patient-status">${p.status || 'Sem status'}</div>`;
+                li.innerHTML = `<div class="patient-name">${p.name}</div><div class="patient-status">${p.status || 'Sem status'} - ${p.tipoAtendimento || 'N/D'}</div>`;
                 
                 const now = new Date();
                 now.setHours(0, 0, 0, 0);
@@ -629,6 +636,9 @@
                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                    </a>` 
                 : '';
+            
+            const freq = patient.visitFrequency;
+            const freqText = freq ? `${freq} ${freq > 1 ? 'Meses' : 'Mês'}` : 'N/A';
 
             patientCardContainer.innerHTML = `
                 <div class="patient-card">
@@ -641,7 +651,7 @@
                             <div class="grid-2-cols">
                                 <p><strong>Equipe:</strong> ${patient.team || 'N/A'}</p>
                                 <p><strong>Status:</strong> ${patient.status || 'N/A'}</p>
-                                <p><strong>CNS:</strong> ${patient.cartaoSus || 'N/A'}</p>
+                                <p><strong>Tipo:</strong> ${patient.tipoAtendimento || 'N/A'}</p>
                                 <p><strong>Telefone:</strong> ${patient.phone || 'N/A'}</p>
                             </div>
                         </section>
@@ -664,7 +674,7 @@
                         <section class="card-section"><h4>Medicações</h4><div class="tag-container">${renderTags(patient.medications)}</div></section>
                         <section class="card-section"><h4>Acompanhamento</h4>
                             <div class="grid-2-cols">
-                                <p><strong>Periodicidade:</strong> ${patient.visitFrequency || 'N/A'}</p>
+                                <p><strong>Periodicidade:</strong> ${freqText}</p>
                                 <p><strong>Última Visita:</strong> ${patient.lastVisit ? new Date(patient.lastVisit + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</p>
                                 <p><strong>Próxima Visita:</strong> ${patient.nextVisit ? new Date(patient.nextVisit + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</p>
                                 <p><strong>Profissional:</strong> ${patient.nextVisitProfessional || 'N/A'}</p>
@@ -750,7 +760,7 @@
         });
 
         // --- Lógica dos Modais ---
-        const createTagInput = (id, label, suggestions, currentTags = []) => {
+        const createTagInput = (id, label, suggestions) => {
             const suggestionsHtml = suggestions.map(s => `<option value="${s}"></option>`).join('');
             
             return `
@@ -792,12 +802,36 @@
                 }
             });
         };
+        
+        function updateAgenteOptions(selectedAgent = null) {
+            const areaSelect = document.getElementById('area');
+            const agenteSelect = document.getElementById('agente');
+            const selectedArea = areaSelect.value;
+            const agentes = agentesPorArea[selectedArea] || [];
+
+            agenteSelect.innerHTML = '<option value="">Selecione...</option>'; 
+
+            agentes.forEach(agente => {
+                const option = document.createElement('option');
+                option.value = agente;
+                option.textContent = agente;
+                if (agente === selectedAgent) {
+                    option.selected = true;
+                }
+                agenteSelect.appendChild(option);
+            });
+        }
 
         window.openPatientModal = (isEditing = false, patientId = null) => {
             const patient = isEditing ? allPatients.find(p => p.id === patientId) : null;
             const comorbidityTags = patient?.comorbidity || [];
             const medicationTags = patient?.medications || [];
 
+            const teamOptions = ['71', '72', '76'].map(t => `<option value="${t}" ${(patient?.team || currentTeam) === t ? 'selected' : ''}>Equipe ${t}</option>`).join('');
+            const statusOptions = ['Ativo', 'Alta', 'Internado', 'Óbito'].map(s => `<option value="${s}" ${patient?.status === s ? 'selected' : ''}>${s}</option>`).join('');
+            const microareaOptionsHtml = microareaOptions.map(m => `<option value="${m}" ${patient?.microArea === m ? 'selected' : ''}>${m}</option>`).join('');
+            const periodicidadeOptionsHtml = [1, 2, 3, 4, 6, 12].map(m => `<option value="${m}" ${patient?.visitFrequency == m ? 'selected' : ''}>${m} ${m > 1 ? 'Meses' : 'Mês'}</option>`).join('');
+            
             patientModalContainer.innerHTML = `
                 <div class="modal-header">
                     <h2>${isEditing ? 'Editar Paciente' : 'Novo Paciente'}</h2>
@@ -808,20 +842,21 @@
                 <div class="modal-body">
                     <input type="hidden" id="patient-id" value="${patient?.id || ''}">
                     <div class="form-group"><label>Nome Completo</label><input id="name" value="${patient?.name || ''}" required></div>
-                    <div class="form-group"><label>Equipe</label><select id="team">${['71', '72', '76'].map(t => `<option value="${t}" ${ (patient?.team || currentTeam) === t ? 'selected' : ''}>Equipe ${t}</option>`).join('')}</select></div>
+                    <div class="form-group"><label>Equipe</label><select id="team">${teamOptions}</select></div>
                     <div class="form-group"><label>Cartão SUS</label><input id="cartaoSus" value="${patient?.cartaoSus || ''}"></div>
                     <div class="form-group"><label>Telefone</label><input id="phone" type="tel" value="${patient?.phone || ''}"></div>
                     <div class="form-group"><label>Endereço</label><input id="address" value="${patient?.address || ''}"></div>
-                    <div class="form-group"><label>Área</label><input id="area" value="${patient?.area || ''}"></div>
-                    <div class="form-group"><label>Microárea</label><input id="microArea" value="${patient?.microArea || ''}"></div>
+                    <div class="form-group"><label>Área</label><select id="area">${['071', '072', '076'].map(a => `<option value="${a}" ${patient?.area === a ? 'selected' : ''}>${a}</option>`).join('')}</select></div>
+                    <div class="form-group"><label>Microárea</label><select id="microArea"><option value="">Selecione...</option>${microareaOptionsHtml}</select></div>
                     <div class="form-group"><label>Família</label><input id="familia" value="${patient?.familia || ''}"></div>
-                    <div class="form-group"><label>Agente Comunitário</label><input id="agente" value="${patient?.agente || ''}"></div>
+                    <div class="form-group"><label>Agente Comunitário</label><select id="agente"><option value="">Selecione...</option></select></div>
                     <div class="form-group"><label>Cuidador</label><input id="caregiverName" value="${patient?.caregiverName || ''}"></div>
-                    <div class="form-group"><label>Status</label><select id="status">${['Ativo', 'Alta', 'Internado', 'Óbito'].map(s => `<option value="${s}" ${patient?.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+                    <div class="form-group"><label>Status</label><select id="status">${statusOptions}</select></div>
+                    <div class="form-group"><label>Tipo de Atendimento</label><select id="tipoAtendimento"><option value="Domiciliado" ${patient?.tipoAtendimento === 'Domiciliado' ? 'selected' : ''}>Domiciliado</option><option value="Acamado" ${patient?.tipoAtendimento === 'Acamado' ? 'selected' : ''}>Acamado</option></select></div>
                     <div class="form-group"><label>Motivo do Cadastro</label><textarea id="reason">${patient?.reason || ''}</textarea></div>
                     ${createTagInput('comorbidity', 'Comorbidades', comorbiditySuggestions)}
                     ${createTagInput('medications', 'Medicações', remumeSuggestions)}
-                    <div class="form-group"><label>Periodicidade da Visita</label><input id="visitFrequency" value="${patient?.visitFrequency || ''}"></div>
+                    <div class="form-group"><label>Periodicidade da Visita</label><select id="visitFrequency"><option value="">Nenhuma</option>${periodicidadeOptionsHtml}</select></div>
                     <div class="form-group"><label>Última Visita</label><input type="date" id="lastVisit" value="${patient?.lastVisit || ''}"></div>
                     <div class="form-group"><label>Próxima Visita</label><input type="date" id="nextVisit" value="${patient?.nextVisit || ''}"></div>
                     <div class="form-group"><label>Profissional (Próxima Visita)</label><input id="nextVisitProfessional" value="${patient?.nextVisitProfessional || ''}"></div>
@@ -832,6 +867,11 @@
 
             setupTagInput('comorbidity', comorbidityTags);
             setupTagInput('medications', medicationTags);
+            
+            const areaSelect = document.getElementById('area');
+            areaSelect.addEventListener('change', () => updateAgenteOptions());
+            updateAgenteOptions(patient?.agente);
+
             patientModalContainer.classList.add('visible');
         };
         
@@ -841,22 +881,23 @@
             const id = document.getElementById('patient-id').value;
             const isNewPatient = !id;
             const patientData = {
-                name: document.getElementById('name').value,
+                name: document.getElementById('name').value.trim(),
                 team: document.getElementById('team').value,
-                cartaoSus: document.getElementById('cartaoSus').value,
-                phone: document.getElementById('phone').value,
-                address: document.getElementById('address').value,
+                cartaoSus: document.getElementById('cartaoSus').value.trim(),
+                phone: document.getElementById('phone').value.trim(),
+                address: document.getElementById('address').value.trim(),
                 area: document.getElementById('area').value,
                 microArea: document.getElementById('microArea').value,
-                familia: document.getElementById('familia').value,
+                familia: document.getElementById('familia').value.trim(),
                 agente: document.getElementById('agente').value,
-                caregiverName: document.getElementById('caregiverName').value,
+                caregiverName: document.getElementById('caregiverName').value.trim(),
                 status: document.getElementById('status').value,
-                reason: document.getElementById('reason').value,
+                tipoAtendimento: document.getElementById('tipoAtendimento').value,
+                reason: document.getElementById('reason').value.trim(),
                 visitFrequency: document.getElementById('visitFrequency').value,
                 lastVisit: document.getElementById('lastVisit').value,
                 nextVisit: document.getElementById('nextVisit').value,
-                nextVisitProfessional: document.getElementById('nextVisitProfessional').value,
+                nextVisitProfessional: document.getElementById('nextVisitProfessional').value.trim(),
                 comorbidity: Array.from(document.querySelectorAll('#comorbidity-tags .tag-item')).map(t => t.innerText.slice(0, -1).trim()),
                 medications: Array.from(document.querySelectorAll('#medications-tags .tag-item')).map(t => t.innerText.slice(0, -1).trim())
             };
