@@ -660,7 +660,7 @@
                 </div>
                  <div class="form-group">
                     <label for="p_tipo_atendimento">Tipo de Atendimento</label>
-                    <input type="text" id="p_tipo_atendimento" value="${patient.tipo_atendimento || ''}">
+                    <textarea id="p_tipo_atendimento">${patient.tipo_atendimento || ''}</textarea>
                 </div>
             </div>
             <div class="form-group"> <label for="p_endereco">Endereço</label> <input type="text" id="p_endereco" value="${patient.endereco || ''}"> </div>
@@ -830,30 +830,93 @@
             saveButton.disabled = true;
             saveButton.textContent = 'Salvando...';
 
-            let error;
-            if (isEditing) {
-                const { error: updateError } = await db.from('pacientes').update(patientData).eq('id', patientId);
-                error = updateError;
-            } else {
-                const { error: insertError } = await db.from('pacientes').insert([patientData]);
-                error = insertError;
+            // Check for existing patient with the same CNS
+            const { data: existingPatient, error: checkError } = await db
+                .from('pacientes')
+                .select('*') 
+                .eq('cartao_sus', patientData.cartao_sus)
+                .single();
+
+            if (checkError && checkError.code !== 'PGRST116') {
+                 console.error("Erro ao checar CNS existente:", checkError);
+                 showMessageModal("Ocorreu um erro ao verificar o CNS. Tente novamente.");
+                 saveButton.disabled = false;
+                 saveButton.textContent = 'Salvar';
+                 return;
             }
 
-            if (error) {
-                console.error("Erro ao salvar paciente", error);
-                if (error.code === '23505') {
-                   showMessageModal("Erro ao salvar: O CNS informado já está cadastrado para outro paciente. Por favor, verifique o número.");
+            if (isEditing) {
+                // --- LÓGICA DE EDIÇÃO ---
+                if (existingPatient && existingPatient.id !== patientId) {
+                    // Trying to change CNS to one that already exists for another patient
+                    showConfirmationModal(
+                        `O CNS informado já pertence a(o) paciente ${existingPatient.nome}. Deseja que os dados atuais sobrescrevam o cadastro dele? O paciente que você estava editando (${patient.nome}) será removido.`,
+                        async () => {
+                            // 1. Update the existing patient
+                            const { error: updateError } = await db.from('pacientes').update(patientData).eq('id', existingPatient.id);
+                            if (updateError) {
+                                showMessageModal("Ocorreu um erro ao sobrescrever os dados do paciente.");
+                                console.error("Erro ao sobrescrever:", updateError);
+                                return;
+                            }
+                            // 2. Delete the old patient record
+                            const { error: deleteError } = await db.from('pacientes').delete().eq('id', patientId);
+                            if (deleteError) {
+                                showMessageModal("Dados sobrescritos, mas ocorreu um erro ao remover o cadastro antigo. Por favor, remova-o manualmente.");
+                                console.error("Erro ao deletar paciente antigo:", deleteError);
+                            }
+                            
+                            closePatientModal();
+                            handleDeselectPatient();
+                            await loadDataAndSubscribe();
+                        }
+                    );
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Salvar';
                 } else {
-                   showMessageModal("Ocorreu um erro ao salvar. Verifique os dados e tente novamente.");
+                    // Normal update, no CNS conflict
+                    const { error: updateError } = await db.from('pacientes').update(patientData).eq('id', patientId);
+                    if (updateError) {
+                         console.error("Erro ao atualizar paciente", updateError);
+                         showMessageModal("Ocorreu um erro ao atualizar. Verifique os dados e tente novamente.");
+                         saveButton.disabled = false;
+                         saveButton.textContent = 'Salvar';
+                    } else {
+                         closePatientModal();
+                         await renderPatientDetails(patientId);
+                         await loadDataAndSubscribe();
+                    }
                 }
-                saveButton.disabled = false;
-                saveButton.textContent = 'Salvar';
             } else {
-                closePatientModal();
-                if(isEditing) {
-                    await renderPatientDetails(patientId);
+                // --- LÓGICA DE CRIAÇÃO ---
+                if (existingPatient) {
+                    showConfirmationModal(
+                        `Já existe um paciente (${existingPatient.nome}) com este CNS. Deseja sobrescrever os dados dele com as novas informações?`,
+                        async () => {
+                            const { error: updateError } = await db.from('pacientes').update(patientData).eq('id', existingPatient.id);
+                            if (updateError) {
+                                showMessageModal("Ocorreu um erro ao sobrescrever os dados do paciente.");
+                                console.error("Erro ao sobrescrever:", updateError);
+                            } else {
+                                closePatientModal();
+                                await loadDataAndSubscribe();
+                            }
+                        }
+                    );
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Salvar';
+                } else {
+                    const { error: insertError } = await db.from('pacientes').insert([patientData]);
+                    if (insertError) {
+                         console.error("Erro ao criar paciente", insertError);
+                         showMessageModal("Ocorreu um erro ao criar o paciente. Verifique os dados e tente novamente.");
+                         saveButton.disabled = false;
+                         saveButton.textContent = 'Salvar';
+                    } else {
+                        closePatientModal();
+                        await loadDataAndSubscribe();
+                    }
                 }
-                await loadDataAndSubscribe();
             }
         };
     }
