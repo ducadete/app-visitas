@@ -125,6 +125,9 @@
       <header class="main-header">
         <h1>Acompanhamento</h1>
         <div class="header-actions">
+           <button id="header-add-patient-btn" class="btn-icon" title="Cadastrar Paciente">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="17" y1="11" x2="23" y2="11"></line></svg>
+          </button>
           <button id="notification-bell" class="btn-icon notification-bell">
             <svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.5V11C18 7.13 14.87 4 11 4S4 7.13 4 11V16.5L2 18.5V19.5H20V18.5L18 16.5ZM11 22C12.1 22 13 21.1 13 20H9C9 21.1 9.9 22 11 22Z"/></svg>
             <div id="notification-badge" class="notification-badge hidden">0</div>
@@ -226,6 +229,7 @@
     const editPatientBtn = document.getElementById('edit-patient-btn');
     const deletePatientBtn = document.getElementById('delete-patient-btn');
     const moreOptionsBtn = document.getElementById('more-options-btn');
+    const headerAddPatientBtn = document.getElementById('header-add-patient-btn');
 
     // ===== ESTADO =====
     let allPatients = [];
@@ -794,6 +798,7 @@
       
       // ===== MUDANÇA: CONECTANDO BOTÕES ADD E EDIT =====
       addPatientBtn.addEventListener('click', () => openPatientModal());
+      headerAddPatientBtn.addEventListener('click', () => openPatientModal());
       editPatientBtn.addEventListener('click', () => {
           if (selectedPatientId) {
               openPatientModal(selectedPatientId);
@@ -833,3 +838,4 @@
   </script>
 </body>
 </html>
+
