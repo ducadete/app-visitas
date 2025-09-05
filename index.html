@@ -105,6 +105,45 @@
     .notification-item .patient-name{font-weight:bold}
     .notification-item .overdue-date{font-size:12px;color:var(--danger-color)}
     .hidden{display:none!important}
+
+    /* Simple Message Modal */
+    .message-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 2000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    .message-modal-box {
+        background: #fff;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        max-width: 320px;
+        width: 100%;
+        text-align: center;
+    }
+    .message-modal-box p {
+        margin: 0 0 20px 0;
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--text-color);
+    }
+    .message-modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    .message-modal-actions .btn {
+      width: auto;
+      min-width: 100px;
+    }
   </style>
 </head>
 <body>
@@ -246,6 +285,59 @@
 
     const medicationSuggestions = ['Losartana','Hidroclorotiazida','AAS','Metformina','Glibenclamida','Insulina NPH','Omeprazol','Sinvastatina','Paracetamol','Dipirona'];
     const comorbiditySuggestions = ['Hipertensão Arterial (HAS)','Diabetes Mellitus (DM)','DPOC','Insuficiência Cardíaca (ICC)','Doença Renal Crônica (DRC)','Sequela de AVC','Demência / Alzheimer','Depressão'];
+
+    // ===== FUNÇÕES DE MODAL =====
+    function showConfirmationModal(message, onConfirm) {
+        const modalId = 'confirmation-modal-' + Date.now();
+        const modalHtml = `
+            <div id="${modalId}" class="message-modal-overlay">
+                <div class="message-modal-box">
+                    <p>${message}</p>
+                    <div class="message-modal-actions">
+                        <button id="cancel-btn" class="btn btn-primary">Não</button>
+                        <button id="confirm-btn" class="btn btn-danger">Sim</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const modalElement = document.getElementById(modalId);
+        
+        const removeModal = () => {
+            if (modalElement) modalElement.remove();
+        };
+
+        modalElement.querySelector('#confirm-btn').addEventListener('click', () => {
+            onConfirm();
+            removeModal();
+        });
+        modalElement.querySelector('#cancel-btn').addEventListener('click', removeModal);
+    }
+
+    function showMessageModal(message) {
+         const modalId = 'message-modal-' + Date.now();
+        const modalHtml = `
+            <div id="${modalId}" class="message-modal-overlay">
+                <div class="message-modal-box">
+                    <p>${message}</p>
+                    <div class="message-modal-actions">
+                        <button id="ok-btn" class="btn btn-primary">OK</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const modalElement = document.getElementById(modalId);
+        
+        const removeModal = () => {
+            if (modalElement) modalElement.remove();
+        };
+
+        modalElement.querySelector('#ok-btn').addEventListener('click', removeModal);
+    }
+
 
     // ===== FUNÇÕES DE NOTIFICAÇÃO/LISTA =====
     function updateNotificationBell() {
@@ -557,6 +649,20 @@
                 <div class="form-group"> <label for="p_cartao_sus">CNS</label> <input type="text" id="p_cartao_sus" value="${patient.cartao_sus || ''}"> </div>
                 <div class="form-group"> <label for="p_telefone">Telefone</label> <input type="text" id="p_telefone" value="${patient.telefone || ''}"> </div>
             </div>
+            <div class="grid-2-cols">
+                <div class="form-group">
+                    <label for="p_status">Status</label>
+                    <select id="p_status">
+                        <option value="Ativo" ${patient.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                        <option value="Óbito" ${patient.status === 'Óbito' ? 'selected' : ''}>Óbito</option>
+                        <option value="Mudou-se" ${patient.status === 'Mudou-se' ? 'selected' : ''}>Mudou-se</option>
+                    </select>
+                </div>
+                 <div class="form-group">
+                    <label for="p_tipo_atendimento">Tipo de Atendimento</label>
+                    <input type="text" id="p_tipo_atendimento" value="${patient.tipo_atendimento || ''}">
+                </div>
+            </div>
             <div class="form-group"> <label for="p_endereco">Endereço</label> <input type="text" id="p_endereco" value="${patient.endereco || ''}"> </div>
             <div class="grid-2-cols">
                 <div class="form-group">
@@ -584,20 +690,12 @@
             <div class="grid-2-cols">
                 <div class="form-group">
                     <label for="p_familia">Família</label>
-                    <input type="number" id="p_familia" value="${patient.familia || ''}">
+                    <input type="text" id="p_familia" value="${patient.familia || ''}">
                 </div>
-                <div class="form-group">
-                    <label for="p_status">Status</label>
-                    <select id="p_status">
-                        <option value="Ativo" ${patient.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
-                        <option value="Óbito" ${patient.status === 'Óbito' ? 'selected' : ''}>Óbito</option>
-                        <option value="Mudou-se" ${patient.status === 'Mudou-se' ? 'selected' : ''}>Mudou-se</option>
-                    </select>
+                 <div class="form-group">
+                    <label for="p_agente">ACS</label>
+                    <input type="text" id="p_agente" value="${patient.agente || ''}">
                 </div>
-            </div>
-            <div class="form-group">
-                <label for="p_agente">ACS</label>
-                <input type="text" id="p_agente" value="${patient.agente || ''}">
             </div>
              <div class="form-group">
                 <label for="p_cuidador">Cuidador</label>
@@ -702,9 +800,7 @@
         document.getElementById('p_cancelar_header').onclick = closePatientModal;
         document.getElementById('p_salvar').onclick = async () => {
             const saveButton = document.getElementById('p_salvar');
-            saveButton.disabled = true;
-            saveButton.textContent = 'Salvando...';
-
+            
             const getTags = (containerId) => [...document.querySelectorAll(`#${containerId} .tag-input-item span`)].map(span => span.textContent);
 
             const patientData = {
@@ -714,16 +810,25 @@
                 endereco: document.getElementById('p_endereco').value.trim(),
                 area: document.getElementById('p_area').value,
                 micro_area: document.getElementById('p_micro_area').value,
-                familia: document.getElementById('p_familia').value || null,
+                familia: document.getElementById('p_familia').value.trim() || null,
                 agente: document.getElementById('p_agente').value.trim(),
                 cuidador: document.getElementById('p_cuidador').value.trim(),
                 motivo_cadastro: document.getElementById('p_motivo_cadastro').value.trim(),
                 status: document.getElementById('p_status').value,
+                tipo_atendimento: document.getElementById('p_tipo_atendimento').value.trim(),
                 frequencia_visita_meses: parseInt(document.getElementById('p_frequencia').value) || null,
                 comorbidades: getTags('p_comorbidades_tags'),
                 medicacoes: getTags('p_medicacoes_tags'),
                 equipe: document.getElementById('p_equipe').value
             };
+            
+            if (!patientData.nome || !patientData.cartao_sus) {
+                showMessageModal("Os campos 'Nome Completo' e 'CNS' são obrigatórios.");
+                return;
+            }
+            
+            saveButton.disabled = true;
+            saveButton.textContent = 'Salvando...';
 
             let error;
             if (isEditing) {
@@ -736,7 +841,11 @@
 
             if (error) {
                 console.error("Erro ao salvar paciente", error);
-                alert("Ocorreu um erro ao salvar. Verifique os dados e tente novamente.");
+                if (error.code === '23505') {
+                   showMessageModal("Erro ao salvar: O CNS informado já está cadastrado para outro paciente. Por favor, verifique o número.");
+                } else {
+                   showMessageModal("Ocorreu um erro ao salvar. Verifique os dados e tente novamente.");
+                }
                 saveButton.disabled = false;
                 saveButton.textContent = 'Salvar';
             } else {
@@ -775,7 +884,7 @@
         .single();
 
       if (error || !patient) {
-        alert('Não foi possível carregar o paciente para registrar a visita.');
+        showMessageModal('Não foi possível carregar o paciente para registrar a visita.');
         console.error(error);
         return;
       }
@@ -825,7 +934,7 @@
         const observacao = document.getElementById('v_obs').value.trim() || null;
 
         if (!data_visita || !profissional) {
-          alert('Preencha ao menos Data da visita e Profissional.');
+          showMessageModal('Preencha ao menos Data da visita e Profissional.');
           return;
         }
 
@@ -839,7 +948,7 @@
         });
 
         if (insertErr) {
-          alert('Erro ao salvar visita.');
+          showMessageModal('Erro ao salvar visita.');
           console.error(insertErr);
           return;
         }
@@ -916,16 +1025,18 @@
           }
       });
       
-      deletePatientBtn.addEventListener('click', async () => {
-          if (selectedPatientId && confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita.')) {
+      deletePatientBtn.addEventListener('click', () => {
+          if (selectedPatientId) {
+            showConfirmationModal('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita.', async () => {
               const { error } = await db.from('pacientes').delete().eq('id', selectedPatientId);
               if(error) {
                   console.error('Erro ao excluir:', error);
-                  alert('Não foi possível excluir o paciente.');
+                  showMessageModal('Não foi possível excluir o paciente.');
               } else {
                   handleDeselectPatient();
                   loadDataAndSubscribe();
               }
+            });
           }
       });
 
