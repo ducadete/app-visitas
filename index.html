@@ -233,10 +233,6 @@
     let selectedPatientId = null;
     let realtimeChannel = null;
 
-    // (ex.: listas estáticas / sugestões – mantidas caso queira usar depois)
-    const remumeSuggestions = ['Losartana','Hidroclorotiazida','AAS','Metformina','Glibenclamida','Insulina NPH','Omeprazol','Sinvastatina','Paracetamol','Dipirona'];
-    const comorbiditySuggestions = ['Hipertensão Arterial (HAS)','Diabetes Mellitus (DM)','DPOC','Insuficiência Cardíaca (ICC)','Doença Renal Crônica (DRC)','Sequela de AVC','Demência / Alzheimer','Depressão'];
-
     // ===== FUNÇÕES DE NOTIFICAÇÃO/LISTA =====
     function updateNotificationBell() {
       const now = new Date(); now.setHours(0,0,0,0);
@@ -261,7 +257,7 @@
       patientsToRender.forEach(p => {
         const li = document.createElement('li');
         li.dataset.id = p.id;
-        li.innerHTML = `<div class="patient-name">${p.nome}</div><div class="patient-status">${p.status || 'Sem status'} - ${p.tipo_atendimento || 'N/D'}</div>`;
+        li.innerHTML = `<div class="patient-name">${p.nome}</div><div class="patient-status">${p.status || 'Sem status'} - Microárea ${p.micro_area || 'N/D'}</div>`;
         const now = new Date(); now.setHours(0,0,0,0);
         if (p.data_proxima_visita && new Date(p.data_proxima_visita+'T00:00:00') < now) {
           li.classList.add('overdue');
@@ -398,7 +394,7 @@
             <hr style="margin:20px 0">
             <section class="card-section visits-section">
               <h4><span>Histórico de Visitas</span>
-                <button class="btn btn-info" onclick="window.openVisitModal('${patient.id}')">+ Visita</button>
+                <button class="btn btn-info" onclick="openVisitModal('${patient.id}')">+ Visita</button>
               </h4>
               <ul id="visits-list">${visitsHtml}</ul>
             </section>
@@ -407,7 +403,6 @@
     }
 
     async function renderPatientDetails(patientId) {
-      // 1) Busca paciente
       const { data: patient, error: pErr } = await db
         .from('pacientes')
         .select('*')
@@ -419,7 +414,6 @@
         handleDeselectPatient();
         return;
       }
-      // 2) Busca visitas manualmente (independente de FK)
       const { data: visits, error: vErr } = await db
         .from('visitas')
         .select('*')
@@ -478,7 +472,10 @@
 
       if (realtimeChannel) db.removeChannel(realtimeChannel);
       realtimeChannel = db.channel('pacientes_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pacientes' }, () => loadDataAndSubscribe())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pacientes' }, (payload) => {
+            console.log('Realtime update recebido:', payload);
+            loadDataAndSubscribe(); // Recarrega tudo para garantir consistência
+        })
         .subscribe();
     }
 
@@ -498,20 +495,146 @@
     }
 
     async function handleLogout() {
-      if (confirm('Deseja realmente sair?')) {
-        const { error } = await db.auth.signOut();
-        if (error) {
-          console.error('Erro ao sair:', error);
-          alert('Ocorreu um erro ao tentar sair.');
-        }
+      const { error } = await db.auth.signOut();
+      if (error) {
+        console.error('Erro ao sair:', error);
       }
     }
+    
+    // ===== MODAL PACIENTE (NOVO/EDITAR) - INÍCIO DA MUDANÇA =====
+    function closePatientModal() {
+        patientModalContainer.classList.remove('visible');
+        patientModalContainer.innerHTML = '';
+    }
+
+    async function openPatientModal(patientId = null) {
+        const isEditing = !!patientId;
+        let patient = {};
+
+        if (isEditing) {
+            const { data, error } = await db.from('pacientes').select('*').eq('id', patientId).single();
+            if (error) {
+                console.error("Erro ao buscar paciente para edição", error);
+                return;
+            }
+            patient = data;
+        }
+
+        const modalTitle = isEditing ? 'Editar Paciente' : 'Novo Paciente';
+
+        patientModalContainer.innerHTML = `
+        <div class="modal-header">
+            <h2>${modalTitle}</h2>
+            <button class="btn-icon" id="p_cancelar_header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="p_nome">Nome Completo</label>
+                <input type="text" id="p_nome" value="${patient.nome || ''}">
+            </div>
+            <div class="grid-2-cols">
+                <div class="form-group">
+                    <label for="p_cartao_sus">CNS</label>
+                    <input type="text" id="p_cartao_sus" value="${patient.cartao_sus || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="p_telefone">Telefone</label>
+                    <input type="text" id="p_telefone" value="${patient.telefone || ''}">
+                </div>
+            </div>
+             <div class="form-group">
+                <label for="p_endereco">Endereço</label>
+                <input type="text" id="p_endereco" value="${patient.endereco || ''}">
+            </div>
+            <div class="grid-2-cols">
+                 <div class="form-group">
+                    <label for="p_micro_area">Microárea</label>
+                    <input type="text" id="p_micro_area" value="${patient.micro_area || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="p_status">Status</label>
+                    <select id="p_status">
+                        <option value="Ativo" ${patient.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                        <option value="Óbito" ${patient.status === 'Óbito' ? 'selected' : ''}>Óbito</option>
+                        <option value="Mudou-se" ${patient.status === 'Mudou-se' ? 'selected' : ''}>Mudou-se</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="p_comorbidades">Comorbidades (separadas por vírgula)</label>
+                <textarea id="p_comorbidades">${(patient.comorbidades || []).join(', ')}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="p_medicacoes">Medicações (separadas por vírgula)</label>
+                <textarea id="p_medicacoes">${(patient.medicacoes || []).join(', ')}</textarea>
+            </div>
+             <div class="form-group">
+                <label for="p_frequencia">Periodicidade Visita (Meses)</label>
+                <input type="number" id="p_frequencia" min="1" value="${patient.frequencia_visita_meses || ''}">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="p_cancelar" class="btn btn-danger">Cancelar</button>
+            <button id="p_salvar" class="btn btn-success">Salvar</button>
+        </div>`;
+
+        patientModalContainer.classList.add('visible');
+
+        document.getElementById('p_cancelar').onclick = closePatientModal;
+        document.getElementById('p_cancelar_header').onclick = closePatientModal;
+        document.getElementById('p_salvar').onclick = async () => {
+            const saveButton = document.getElementById('p_salvar');
+            saveButton.disabled = true;
+            saveButton.textContent = 'Salvando...';
+
+            const stringToArray = (str) => str ? str.split(',').map(item => item.trim()).filter(Boolean) : [];
+
+            const patientData = {
+                nome: document.getElementById('p_nome').value,
+                cartao_sus: document.getElementById('p_cartao_sus').value,
+                telefone: document.getElementById('p_telefone').value,
+                endereco: document.getElementById('p_endereco').value,
+                micro_area: document.getElementById('p_micro_area').value,
+                status: document.getElementById('p_status').value,
+                comorbidades: stringToArray(document.getElementById('p_comorbidades').value),
+                medicacoes: stringToArray(document.getElementById('p_medicacoes').value),
+                frequencia_visita_meses: parseInt(document.getElementById('p_frequencia').value) || null,
+                equipe: currentTeam // Sempre associa à equipe atual
+            };
+
+            let error;
+            if (isEditing) {
+                const { error: updateError } = await db.from('pacientes').update(patientData).eq('id', patientId);
+                error = updateError;
+            } else {
+                const { error: insertError } = await db.from('pacientes').insert([patientData]);
+                error = insertError;
+            }
+
+            if (error) {
+                console.error("Erro ao salvar paciente", error);
+                alert("Ocorreu um erro ao salvar. Verifique os dados e tente novamente.");
+                saveButton.disabled = false;
+                saveButton.textContent = 'Salvar';
+            } else {
+                closePatientModal();
+                if(isEditing) {
+                    // Se estava editando, precisa atualizar a tela de detalhes
+                    await renderPatientDetails(patientId);
+                }
+                await loadDataAndSubscribe(); // Atualiza a lista principal
+            }
+        };
+    }
+    // ===== MODAL PACIENTE - FIM DA MUDANÇA =====
 
     function openMoreOptionsModal() {
       moreOptionsModalContainer.innerHTML = `
         <div class="modal-header">
           <h2>Mais Opções</h2>
-          <button class="btn-icon" onclick="window.closeMoreOptionsModal()">
+          <button class="btn-icon" onclick="closeMoreOptionsModal()">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
@@ -519,12 +642,14 @@
           <button id="logout-btn-modal" class="btn btn-danger">Sair do Sistema</button>
         </div>`;
       moreOptionsModalContainer.classList.add('visible');
-      document.getElementById('logout-btn-modal').addEventListener('click', handleLogout);
+      document.getElementById('logout-btn-modal').addEventListener('click', () => {
+        closeMoreOptionsModal();
+        handleLogout();
+      });
     }
 
     // ===== VISITAS: modal + insert + atualização do paciente =====
-    window.openVisitModal = async function(patientId) {
-      // Busca dados mínimos do paciente (nome, cartao_sus)
+    async function openVisitModal(patientId) {
       const { data: patient, error } = await db
         .from('pacientes')
         .select('id, nome, cartao_sus')
@@ -540,14 +665,14 @@
       visitModalContainer.innerHTML = `
         <div class="modal-header">
           <h2>Nova Visita — ${patient.nome}</h2>
-          <button class="btn-icon" onclick="window.closeVisitModal()">
+          <button class="btn-icon" onclick="closeVisitModal()">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
         <div class="modal-body">
           <div class="form-group">
             <label for="v_data_visita">Data da visita</label>
-            <input type="date" id="v_data_visita">
+            <input type="date" id="v_data_visita" value="${new Date().toISOString().split('T')[0]}">
           </div>
           <div class="form-group">
             <label for="v_profissional">Profissional</label>
@@ -573,7 +698,7 @@
       `;
       visitModalContainer.classList.add('visible');
 
-      document.getElementById('v_cancelar').onclick = () => window.closeVisitModal();
+      document.getElementById('v_cancelar').onclick = () => closeVisitModal();
       document.getElementById('v_salvar').onclick = async () => {
         const data_visita = document.getElementById('v_data_visita').value;
         const profissional = document.getElementById('v_profissional').value.trim();
@@ -586,9 +711,8 @@
           return;
         }
 
-        // Insert na tabela visitas
         const { error: insertErr } = await db.from('visitas').insert({
-          paciente_cartao_sus: patient.cartao_sus, // vínculo por CNS
+          paciente_cartao_sus: patient.cartao_sus,
           data_visita,
           profissional,
           data_prox_visita,
@@ -602,7 +726,6 @@
           return;
         }
 
-        // Atualiza campos do paciente
         const updates = { data_ultima_visita: data_visita };
         if (data_prox_visita) updates.data_proxima_visita = data_prox_visita;
         if (profissional_prox_visita) updates.profissional_proxima_visita = profissional_prox_visita;
@@ -614,29 +737,31 @@
 
         if (upErr) console.warn('Visita salva, mas não atualizou o paciente:', upErr);
 
-        window.closeVisitModal();
+        closeVisitModal();
         await renderPatientDetails(patientId);
         await loadDataAndSubscribe();
       };
     };
 
-    window.closeVisitModal = function() {
+    function closeVisitModal() {
       visitModalContainer.classList.remove('visible');
       visitModalContainer.innerHTML = '';
     };
 
-    window.closeMoreOptionsModal = function() {
+    function closeMoreOptionsModal() {
       moreOptionsModalContainer.classList.remove('visible');
       moreOptionsModalContainer.innerHTML = '';
     };
 
-    // Stub para não quebrar o botão de adicionar paciente (se clicar)
-    window.openPatientModal = function() {
-      alert('Cadastro de paciente em desenvolvimento.');
-    };
+    // Expondo funções para o escopo global para serem acessíveis pelo HTML (onclick)
+    window.openVisitModal = openVisitModal;
+    window.closeVisitModal = closeVisitModal;
+    window.openPatientModal = openPatientModal;
+    window.closePatientModal = closePatientModal;
+    window.closeMoreOptionsModal = closeMoreOptionsModal;
 
     // ===== INICIALIZAÇÃO =====
-    if (SUPABASE_URL === 'URL_DO_SEU_PROJETO' || SUPABASE_ANON_KEY === 'SUA_CHAVE_ANON') {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       document.body.innerHTML = `<div style="padding:20px;text-align:center"><h2>CONFIGURAÇÃO INCOMPLETA</h2><p>Insira suas chaves do Supabase no código.</p></div>`;
     } else {
       db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -666,7 +791,29 @@
       loginBtn.addEventListener('click', handleLogin);
       passwordInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
       emailInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
-      addPatientBtn.addEventListener('click', () => window.openPatientModal(false));
+      
+      // ===== MUDANÇA: CONECTANDO BOTÕES ADD E EDIT =====
+      addPatientBtn.addEventListener('click', () => openPatientModal());
+      editPatientBtn.addEventListener('click', () => {
+          if (selectedPatientId) {
+              openPatientModal(selectedPatientId);
+          }
+      });
+      // ===== FIM DA MUDANÇA =====
+      
+      deletePatientBtn.addEventListener('click', async () => {
+          if (selectedPatientId && confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita.')) {
+              const { error } = await db.from('pacientes').delete().eq('id', selectedPatientId);
+              if(error) {
+                  console.error('Erro ao excluir:', error);
+                  alert('Não foi possível excluir o paciente.');
+              } else {
+                  handleDeselectPatient();
+                  loadDataAndSubscribe();
+              }
+          }
+      });
+
       backToListBtn.addEventListener('click', handleDeselectPatient);
       searchInput.addEventListener('input', updateView);
       filterSelect.addEventListener('change', updateView);
