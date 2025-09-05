@@ -87,6 +87,13 @@
     .form-group input,.form-group select,.form-group textarea{width:100%;padding:12px;font-size:16px;border:1px solid var(--grey-medium);border-radius:8px;background:#fff}
     .form-group textarea{min-height:80px}
     .modal-footer{padding:16px;background:#fff;border-top:1px solid var(--grey-medium);display:flex;gap:10px;flex-shrink:0}
+    
+    .tag-input-container { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; border: 1px solid var(--grey-medium); border-radius: 8px; background: #fff; margin-bottom: 8px; min-height: 40px; }
+    .tag-input-item { background: var(--primary-color); color: #fff; padding: 5px 10px; border-radius: 16px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+    .remove-tag-btn { background: none; border: none; color: #fff; cursor: pointer; font-weight: bold; font-size: 16px; padding: 0; line-height: 1; }
+    .suggestions-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .suggestion-btn { background: var(--grey-light); border: 1px solid var(--grey-medium); color: var(--text-color); padding: 5px 12px; border-radius: 16px; font-size: 12px; cursor: pointer; }
+    .suggestion-btn:hover { background: var(--primary-light); border-color: var(--primary-color); }
 
     .notification-bell{position:relative}
     .bell-icon{width:24px;height:24px}
@@ -236,6 +243,9 @@
     let currentTeam = '71';
     let selectedPatientId = null;
     let realtimeChannel = null;
+
+    const medicationSuggestions = ['Losartana','Hidroclorotiazida','AAS','Metformina','Glibenclamida','Insulina NPH','Omeprazol','Sinvastatina','Paracetamol','Dipirona'];
+    const comorbiditySuggestions = ['Hipertensão Arterial (HAS)','Diabetes Mellitus (DM)','DPOC','Insuficiência Cardíaca (ICC)','Doença Renal Crônica (DRC)','Sequela de AVC','Demência / Alzheimer','Depressão'];
 
     // ===== FUNÇÕES DE NOTIFICAÇÃO/LISTA =====
     function updateNotificationBell() {
@@ -505,7 +515,6 @@
       }
     }
     
-    // ===== MODAL PACIENTE (NOVO/EDITAR) - INÍCIO DA MUDANÇA =====
     function closePatientModal() {
         patientModalContainer.classList.remove('visible');
         patientModalContainer.innerHTML = '';
@@ -525,6 +534,7 @@
         }
 
         const modalTitle = isEditing ? 'Editar Paciente' : 'Novo Paciente';
+        const teamForForm = isEditing ? patient.equipe : currentTeam;
 
         patientModalContainer.innerHTML = `
         <div class="modal-header">
@@ -535,27 +545,46 @@
         </div>
         <div class="modal-body">
             <div class="form-group">
-                <label for="p_nome">Nome Completo</label>
-                <input type="text" id="p_nome" value="${patient.nome || ''}">
+                <label for="p_equipe">Equipe</label>
+                 <select id="p_equipe">
+                    <option value="71" ${teamForForm == '71' ? 'selected' : ''}>Equipe 71</option>
+                    <option value="72" ${teamForForm == '72' ? 'selected' : ''}>Equipe 72</option>
+                    <option value="76" ${teamForForm == '76' ? 'selected' : ''}>Equipe 76</option>
+                </select>
             </div>
+            <div class="form-group"> <label for="p_nome">Nome Completo</label> <input type="text" id="p_nome" value="${patient.nome || ''}"> </div>
+            <div class="grid-2-cols">
+                <div class="form-group"> <label for="p_cartao_sus">CNS</label> <input type="text" id="p_cartao_sus" value="${patient.cartao_sus || ''}"> </div>
+                <div class="form-group"> <label for="p_telefone">Telefone</label> <input type="text" id="p_telefone" value="${patient.telefone || ''}"> </div>
+            </div>
+            <div class="form-group"> <label for="p_endereco">Endereço</label> <input type="text" id="p_endereco" value="${patient.endereco || ''}"> </div>
             <div class="grid-2-cols">
                 <div class="form-group">
-                    <label for="p_cartao_sus">CNS</label>
-                    <input type="text" id="p_cartao_sus" value="${patient.cartao_sus || ''}">
+                    <label for="p_area">Área</label>
+                    <select id="p_area">
+                        <option value="" ${!patient.area ? 'selected' : ''}>Selecione</option>
+                        <option value="071" ${patient.area == '071' ? 'selected' : ''}>071</option>
+                        <option value="072" ${patient.area == '072' ? 'selected' : ''}>072</option>
+                        <option value="076" ${patient.area == '076' ? 'selected' : ''}>076</option>
+                    </select>
                 </div>
                 <div class="form-group">
-                    <label for="p_telefone">Telefone</label>
-                    <input type="text" id="p_telefone" value="${patient.telefone || ''}">
-                </div>
-            </div>
-             <div class="form-group">
-                <label for="p_endereco">Endereço</label>
-                <input type="text" id="p_endereco" value="${patient.endereco || ''}">
-            </div>
-            <div class="grid-2-cols">
-                 <div class="form-group">
                     <label for="p_micro_area">Microárea</label>
-                    <input type="text" id="p_micro_area" value="${patient.micro_area || ''}">
+                    <select id="p_micro_area">
+                        <option value="" ${!patient.micro_area ? 'selected' : ''}>Selecione</option>
+                        <option value="01" ${patient.micro_area == '01' ? 'selected' : ''}>01</option>
+                        <option value="02" ${patient.micro_area == '02' ? 'selected' : ''}>02</option>
+                        <option value="03" ${patient.micro_area == '03' ? 'selected' : ''}>03</option>
+                        <option value="04" ${patient.micro_area == '04' ? 'selected' : ''}>04</option>
+                        <option value="05" ${patient.micro_area == '05' ? 'selected' : ''}>05</option>
+                        <option value="06" ${patient.micro_area == '06' ? 'selected' : ''}>06</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2-cols">
+                <div class="form-group">
+                    <label for="p_familia">Família</label>
+                    <input type="number" id="p_familia" value="${patient.familia || ''}">
                 </div>
                 <div class="form-group">
                     <label for="p_status">Status</label>
@@ -567,24 +596,107 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="p_comorbidades">Comorbidades (separadas por vírgula)</label>
-                <textarea id="p_comorbidades">${(patient.comorbidades || []).join(', ')}</textarea>
-            </div>
-            <div class="form-group">
-                <label for="p_medicacoes">Medicações (separadas por vírgula)</label>
-                <textarea id="p_medicacoes">${(patient.medicacoes || []).join(', ')}</textarea>
+                <label for="p_agente">ACS</label>
+                <input type="text" id="p_agente" value="${patient.agente || ''}">
             </div>
              <div class="form-group">
-                <label for="p_frequencia">Periodicidade Visita (Meses)</label>
-                <input type="number" id="p_frequencia" min="1" value="${patient.frequencia_visita_meses || ''}">
+                <label for="p_cuidador">Cuidador</label>
+                <input type="text" id="p_cuidador" value="${patient.cuidador || ''}">
+            </div>
+            <div class="form-group">
+                <label for="p_motivo_cadastro">Motivo do Cadastro</label>
+                <textarea id="p_motivo_cadastro">${patient.motivo_cadastro || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="p_frequencia">Periodicidade Visita</label>
+                <select id="p_frequencia">
+                    <option value="" ${!patient.frequencia_visita_meses ? 'selected' : ''}>Não definida</option>
+                    <option value="1" ${patient.frequencia_visita_meses == 1 ? 'selected' : ''}>1 Mês</option>
+                    <option value="2" ${patient.frequencia_visita_meses == 2 ? 'selected' : ''}>2 Meses</option>
+                    <option value="3" ${patient.frequencia_visita_meses == 3 ? 'selected' : ''}>3 Meses</option>
+                    <option value="4" ${patient.frequencia_visita_meses == 4 ? 'selected' : ''}>4 Meses</option>
+                    <option value="6" ${patient.frequencia_visita_meses == 6 ? 'selected' : ''}>6 Meses</option>
+                    <option value="12" ${patient.frequencia_visita_meses == 12 ? 'selected' : ''}>12 Meses</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="p_comorbidades_input">Comorbidades</label>
+                <div id="p_comorbidades_tags" class="tag-input-container"></div>
+                <input type="text" id="p_comorbidades_input" placeholder="Digite e aperte Enter para adicionar">
+                <div id="p_comorbidades_suggestions" class="suggestions-container"></div>
+            </div>
+            <div class="form-group">
+                <label for="p_medicacoes_input">Medicações</label>
+                <div id="p_medicacoes_tags" class="tag-input-container"></div>
+                <input type="text" id="p_medicacoes_input" placeholder="Digite e aperte Enter para adicionar">
+                <div id="p_medicacoes_suggestions" class="suggestions-container"></div>
             </div>
         </div>
         <div class="modal-footer">
             <button id="p_cancelar" class="btn btn-danger">Cancelar</button>
             <button id="p_salvar" class="btn btn-success">Salvar</button>
         </div>`;
-
         patientModalContainer.classList.add('visible');
+        
+        const setupTagInput = (inputId, tagsContainerId, suggestionsContainerId, suggestionsArray) => {
+            const input = document.getElementById(inputId);
+            const tagsContainer = document.getElementById(tagsContainerId);
+            const suggestionsContainer = document.getElementById(suggestionsContainerId);
+
+            const addTag = (text) => {
+                const tagContent = text.trim();
+                if (tagContent.length < 1) return;
+                
+                const existingTags = [...tagsContainer.querySelectorAll('span')].map(t => t.textContent);
+                if (existingTags.includes(tagContent)) {
+                    input.value = '';
+                    return;
+                }
+
+                const tagEl = document.createElement('div');
+                tagEl.className = 'tag-input-item';
+                tagEl.innerHTML = `<span>${tagContent}</span><button class="remove-tag-btn">&times;</button>`;
+                tagEl.querySelector('.remove-tag-btn').addEventListener('click', () => tagEl.remove());
+                tagsContainer.appendChild(tagEl);
+                input.value = '';
+            };
+
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addTag(input.value);
+                }
+            });
+
+            suggestionsContainer.innerHTML = suggestionsArray.map(s => `<button class="suggestion-btn">${s}</button>`).join('');
+            suggestionsContainer.querySelectorAll('.suggestion-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    addTag(e.target.textContent);
+                });
+            });
+
+            return (existingTags) => {
+                tagsContainer.innerHTML = '';
+                if(Array.isArray(existingTags)) {
+                    existingTags.forEach(tagText => {
+                        const tagEl = document.createElement('div');
+                        tagEl.className = 'tag-input-item';
+                        tagEl.innerHTML = `<span>${tagText}</span><button class="remove-tag-btn">&times;</button>`;
+                        tagEl.querySelector('.remove-tag-btn').addEventListener('click', () => tagEl.remove());
+                        tagsContainer.appendChild(tagEl);
+                    });
+                }
+            }
+        };
+
+        const populateComorbidities = setupTagInput('p_comorbidades_input', 'p_comorbidades_tags', 'p_comorbidades_suggestions', comorbiditySuggestions);
+        const populateMedications = setupTagInput('p_medicacoes_input', 'p_medicacoes_tags', 'p_medicacoes_suggestions', medicationSuggestions);
+
+        if(isEditing) {
+            populateComorbidities(patient.comorbidades);
+            populateMedications(patient.medicacoes);
+        }
 
         document.getElementById('p_cancelar').onclick = closePatientModal;
         document.getElementById('p_cancelar_header').onclick = closePatientModal;
@@ -593,19 +705,24 @@
             saveButton.disabled = true;
             saveButton.textContent = 'Salvando...';
 
-            const stringToArray = (str) => str ? str.split(',').map(item => item.trim()).filter(Boolean) : [];
+            const getTags = (containerId) => [...document.querySelectorAll(`#${containerId} .tag-input-item span`)].map(span => span.textContent);
 
             const patientData = {
-                nome: document.getElementById('p_nome').value,
-                cartao_sus: document.getElementById('p_cartao_sus').value,
-                telefone: document.getElementById('p_telefone').value,
-                endereco: document.getElementById('p_endereco').value,
+                nome: document.getElementById('p_nome').value.trim(),
+                cartao_sus: document.getElementById('p_cartao_sus').value.trim(),
+                telefone: document.getElementById('p_telefone').value.trim(),
+                endereco: document.getElementById('p_endereco').value.trim(),
+                area: document.getElementById('p_area').value,
                 micro_area: document.getElementById('p_micro_area').value,
+                familia: document.getElementById('p_familia').value || null,
+                agente: document.getElementById('p_agente').value.trim(),
+                cuidador: document.getElementById('p_cuidador').value.trim(),
+                motivo_cadastro: document.getElementById('p_motivo_cadastro').value.trim(),
                 status: document.getElementById('p_status').value,
-                comorbidades: stringToArray(document.getElementById('p_comorbidades').value),
-                medicacoes: stringToArray(document.getElementById('p_medicacoes').value),
                 frequencia_visita_meses: parseInt(document.getElementById('p_frequencia').value) || null,
-                equipe: currentTeam // Sempre associa à equipe atual
+                comorbidades: getTags('p_comorbidades_tags'),
+                medicacoes: getTags('p_medicacoes_tags'),
+                equipe: document.getElementById('p_equipe').value
             };
 
             let error;
@@ -625,14 +742,12 @@
             } else {
                 closePatientModal();
                 if(isEditing) {
-                    // Se estava editando, precisa atualizar a tela de detalhes
                     await renderPatientDetails(patientId);
                 }
-                await loadDataAndSubscribe(); // Atualiza a lista principal
+                await loadDataAndSubscribe();
             }
         };
     }
-    // ===== MODAL PACIENTE - FIM DA MUDANÇA =====
 
     function openMoreOptionsModal() {
       moreOptionsModalContainer.innerHTML = `
@@ -652,7 +767,6 @@
       });
     }
 
-    // ===== VISITAS: modal + insert + atualização do paciente =====
     async function openVisitModal(patientId) {
       const { data: patient, error } = await db
         .from('pacientes')
@@ -757,14 +871,12 @@
       moreOptionsModalContainer.innerHTML = '';
     };
 
-    // Expondo funções para o escopo global para serem acessíveis pelo HTML (onclick)
     window.openVisitModal = openVisitModal;
     window.closeVisitModal = closeVisitModal;
     window.openPatientModal = openPatientModal;
     window.closePatientModal = closePatientModal;
     window.closeMoreOptionsModal = closeMoreOptionsModal;
 
-    // ===== INICIALIZAÇÃO =====
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       document.body.innerHTML = `<div style="padding:20px;text-align:center"><h2>CONFIGURAÇÃO INCOMPLETA</h2><p>Insira suas chaves do Supabase no código.</p></div>`;
     } else {
@@ -796,7 +908,6 @@
       passwordInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
       emailInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
       
-      // ===== MUDANÇA: CONECTANDO BOTÕES ADD E EDIT =====
       addPatientBtn.addEventListener('click', () => openPatientModal());
       headerAddPatientBtn.addEventListener('click', () => openPatientModal());
       editPatientBtn.addEventListener('click', () => {
@@ -804,7 +915,6 @@
               openPatientModal(selectedPatientId);
           }
       });
-      // ===== FIM DA MUDANÇA =====
       
       deletePatientBtn.addEventListener('click', async () => {
           if (selectedPatientId && confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita.')) {
