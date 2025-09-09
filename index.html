@@ -106,6 +106,30 @@
     .notification-item .overdue-date{font-size:12px;color:var(--danger-color)}
     .hidden{display:none!important}
 
+    .form-group-with-icon { position: relative; }
+    .mic-btn {
+        position: absolute;
+        top: 32px; /* Adjusted for better alignment with label */
+        right: 8px;
+        padding: 5px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--grey-dark);
+        z-index: 10;
+    }
+    .mic-btn svg { width: 20px; height: 20px; }
+    .mic-btn.listening svg {
+        stroke: var(--danger-color);
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+
     /* Simple Message Modal */
     .message-modal-overlay {
         position: fixed;
@@ -144,6 +168,52 @@
       width: auto;
       min-width: 100px;
     }
+
+    /* Atendimento Records Modal Styles */
+    .atendimentos-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .atendimento-item {
+        background: var(--grey-light);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border-left: 4px solid var(--primary-color);
+    }
+    .atendimento-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid var(--grey-medium);
+        font-size: 14px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .atendimento-header strong {
+        color: var(--primary-color);
+    }
+    .atendimento-body .soap-section {
+        margin-bottom: 12px;
+    }
+    .atendimento-body .soap-section:last-child {
+        margin-bottom: 0;
+    }
+    .atendimento-body h4 {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-color);
+        margin-bottom: 4px;
+    }
+    .atendimento-body p {
+        font-size: 15px;
+        line-height: 1.5;
+        white-space: pre-wrap; /* Preserve line breaks entered in the textarea */
+        word-wrap: break-word;
+    }
   </style>
 </head>
 <body>
@@ -173,7 +243,7 @@
         <div class="header-actions">
            <button id="header-add-patient-btn" class="btn-icon" title="Cadastrar Paciente">
              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="17" y1="11" x2="23" y2="11"></line></svg>
-          </button>
+           </button>
           <button id="notification-bell" class="btn-icon notification-bell">
             <svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.5V11C18 7.13 14.87 4 11 4S4 7.13 4 11V16.5L2 18.5V19.5H20V18.5L18 16.5ZM11 22C12.1 22 13 21.1 13 20H9C9 21.1 9.9 22 11 22Z"/></svg>
             <div id="notification-badge" class="notification-badge hidden">0</div>
@@ -241,6 +311,8 @@
   <div id="patient-modal" class="modal-overlay"></div>
   <div id="visit-modal" class="modal-overlay"></div>
   <div id="more-options-modal" class="modal-overlay"></div>
+  <div id="atendimento-modal" class="modal-overlay"></div>
+  <div id="atendimento-records-modal" class="modal-overlay"></div>
 
   <script type="module">
     // ===== SUPABASE =====
@@ -270,6 +342,8 @@
     const patientModalContainer = document.getElementById('patient-modal');
     const visitModalContainer = document.getElementById('visit-modal');
     const moreOptionsModalContainer = document.getElementById('more-options-modal');
+    const atendimentoModalContainer = document.getElementById('atendimento-modal');
+    const atendimentoRecordsModalContainer = document.getElementById('atendimento-records-modal');
     const backToListBtn = document.getElementById('back-to-list-btn');
     const detailsHeaderTitle = document.getElementById('details-header-title');
     const editPatientBtn = document.getElementById('edit-patient-btn');
@@ -282,6 +356,7 @@
     let currentTeam = '71';
     let selectedPatientId = null;
     let realtimeChannel = null;
+    let recognition = null; // Speech recognition instance
 
     const medicationSuggestions = ['Losartana','Hidroclorotiazida','AAS','Metformina','Glibenclamida','Insulina NPH','Omeprazol','Sinvastatina','Paracetamol','Dipirona'];
     const comorbiditySuggestions = ['Hipertensão Arterial (HAS)','Diabetes Mellitus (DM)','DPOC','Insuficiência Cardíaca (ICC)','Doença Renal Crônica (DRC)','Sequela de AVC','Demência / Alzheimer','Depressão'];
@@ -316,7 +391,7 @@
     }
 
     function showMessageModal(message) {
-         const modalId = 'message-modal-' + Date.now();
+       const modalId = 'message-modal-' + Date.now();
         const modalHtml = `
             <div id="${modalId}" class="message-modal-overlay">
                 <div class="message-modal-box">
@@ -338,6 +413,288 @@
         modalElement.querySelector('#ok-btn').addEventListener('click', removeModal);
     }
 
+    async function showPasswordPrompt(onConfirm) {
+        const modalId = 'password-prompt-' + Date.now();
+        const modalHtml = `
+            <div id="${modalId}" class="message-modal-overlay">
+                <div class="message-modal-box">
+                    <h3 style="margin-bottom: 15px; color: var(--primary-color);">Acesso Restrito</h3>
+                    <p>Digite a senha de acesso para médicos e enfermeiros.</p>
+                    <div class="form-group" style="margin-bottom: 10px; text-align: left;">
+                         <input type="password" id="access-password-input" style="text-align: center;" placeholder="******">
+                    </div>
+                    <p id="password-error" style="color: var(--danger-color); height: 18px; font-size: 14px;"></p>
+                    <div class="message-modal-actions">
+                        <button id="cancel-btn" class="btn btn-danger">Cancelar</button>
+                        <button id="confirm-btn" class="btn btn-success">Confirmar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const modalElement = document.getElementById(modalId);
+        const passwordInputEl = modalElement.querySelector('#access-password-input');
+        const errorEl = modalElement.querySelector('#password-error');
+        
+        const removeModal = () => {
+            if (modalElement) modalElement.remove();
+        };
+
+        modalElement.querySelector('#confirm-btn').addEventListener('click', async () => {
+            try {
+                // Busca a senha do Supabase
+                const { data, error } = await db
+                    .from('configuracoes')
+                    .select('valor')
+                    .eq('chave', 'senha_medica')
+                    .single();
+
+                if (error || !data) {
+                    throw new Error("Não foi possível verificar a senha. Verifique a configuração no Supabase.");
+                }
+
+                const correctPassword = data.valor;
+
+                if (passwordInputEl.value === correctPassword) {
+                    onConfirm();
+                    removeModal();
+                } else {
+                    errorEl.textContent = 'Senha incorreta.';
+                    passwordInputEl.value = '';
+                    passwordInputEl.focus();
+                }
+            } catch (err) {
+                 console.error("Erro ao verificar senha:", err);
+                 errorEl.textContent = "Erro ao verificar senha.";
+            }
+        });
+
+        passwordInputEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                 modalElement.querySelector('#confirm-btn').click();
+            }
+        });
+
+        modalElement.querySelector('#cancel-btn').addEventListener('click', removeModal);
+        passwordInputEl.focus();
+    }
+    
+    // ===== FUNÇÕES DE ATENDIMENTO (S.O.A.P) =====
+    function startSpeechRecognition(textareaId, buttonElement) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            showMessageModal('Seu navegador não suporta a funcionalidade de voz.');
+            return;
+        }
+
+        if (recognition && recognition.isListening) {
+            recognition.stop();
+            return;
+        }
+
+        recognition = new SpeechRecognition();
+        recognition.lang = 'pt-BR';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.isListening = false;
+
+        const textarea = document.getElementById(textareaId);
+
+        recognition.onstart = () => {
+            recognition.isListening = true;
+            buttonElement.classList.add('listening');
+        };
+
+        recognition.onend = () => {
+            recognition.isListening = false;
+            buttonElement.classList.remove('listening');
+            recognition = null;
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Erro no reconhecimento de voz:', event.error);
+            showMessageModal('Ocorreu um erro ao tentar usar o microfone.');
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            textarea.value += (textarea.value.length > 0 ? ' ' : '') + transcript;
+        };
+
+        recognition.start();
+    }
+
+    async function openAtendimentoForm(patientId) {
+        const patient = allPatients.find(p => p.id === patientId);
+        if (!patient) {
+            showMessageModal('Paciente não encontrado.');
+            return;
+        }
+
+        atendimentoModalContainer.innerHTML = `
+            <div class="modal-header">
+                <h2>Atendimento Domiciliar</h2>
+                <button class="btn-icon" onclick="closeAtendimentoModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px;"><strong>Paciente:</strong> ${patient.nome}</p>
+                <div class="form-group">
+                    <label for="at_profissional">Seu Nome (Profissional)</label>
+                    <input type="text" id="at_profissional" placeholder="Digite seu nome">
+                </div>
+                <div class="form-group form-group-with-icon">
+                    <label for="at_subjetivo">Subjetivo (S)</label>
+                    <button id="mic-s" class="mic-btn" onclick="startSpeechRecognition('at_subjetivo', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                    </button>
+                    <textarea id="at_subjetivo"></textarea>
+                </div>
+                 <div class="form-group form-group-with-icon">
+                    <label for="at_objetivo">Objetivo (O)</label>
+                    <button id="mic-o" class="mic-btn" onclick="startSpeechRecognition('at_objetivo', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                    </button>
+                    <textarea id="at_objetivo"></textarea>
+                </div>
+                 <div class="form-group form-group-with-icon">
+                    <label for="at_avaliacao">Avaliação (A)</label>
+                     <button id="mic-a" class="mic-btn" onclick="startSpeechRecognition('at_avaliacao', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                    </button>
+                    <textarea id="at_avaliacao"></textarea>
+                </div>
+                 <div class="form-group form-group-with-icon">
+                    <label for="at_plano">Plano (P)</label>
+                     <button id="mic-p" class="mic-btn" onclick="startSpeechRecognition('at_plano', this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                    </button>
+                    <textarea id="at_plano"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeAtendimentoModal()">Cancelar</button>
+                <button id="save-atendimento-btn" class="btn btn-success">Salvar</button>
+            </div>
+        `;
+        atendimentoModalContainer.classList.add('visible');
+
+        document.getElementById('save-atendimento-btn').addEventListener('click', async () => {
+            const atendimentoData = {
+                paciente_id: patientId,
+                data_atendimento: new Date().toISOString().split('T')[0],
+                subjetivo: document.getElementById('at_subjetivo').value.trim(),
+                objetivo: document.getElementById('at_objetivo').value.trim(),
+                avaliacao: document.getElementById('at_avaliacao').value.trim(),
+                plano: document.getElementById('at_plano').value.trim(),
+                profissional_nome: document.getElementById('at_profissional').value.trim()
+            };
+
+            if (!atendimentoData.profissional_nome) {
+                showMessageModal('Por favor, preencha o seu nome.');
+                return;
+            }
+
+            const { error } = await db.from('atendimentos').insert([atendimentoData]);
+
+            if (error) {
+                console.error('Erro ao salvar atendimento:', error);
+                showMessageModal('Falha ao salvar o atendimento. Verifique se a tabela "atendimentos" foi criada corretamente no Supabase.');
+            } else {
+                showMessageModal('Atendimento salvo com sucesso!');
+                closeAtendimentoModal();
+            }
+        });
+    }
+
+    function closeAtendimentoModal() {
+        atendimentoModalContainer.classList.remove('visible');
+        atendimentoModalContainer.innerHTML = '';
+    }
+    
+    async function openAtendimentoRecords(patientId) {
+        showPasswordPrompt(async () => {
+            atendimentoRecordsModalContainer.innerHTML = `
+                <div class="modal-header"><h2>Registros de Atendimento</h2></div>
+                <div class="modal-body" style="text-align:center; padding: 40px;">Carregando registros...</div>
+            `;
+            atendimentoRecordsModalContainer.classList.add('visible');
+
+            const { data: atendimentos, error } = await db
+                .from('atendimentos')
+                .select('*')
+                .eq('paciente_id', patientId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Erro ao buscar atendimentos:', error);
+                showMessageModal('Não foi possível carregar os registros de atendimento.');
+                closeAtendimentoRecordsModal();
+                return;
+            }
+
+            let recordsHtml = '<p>Nenhum atendimento registrado para este paciente.</p>';
+
+            if (atendimentos && atendimentos.length > 0) {
+                recordsHtml = atendimentos.map(at => {
+                    const dataHora = new Date(at.created_at);
+                    const dataFormatada = dataHora.toLocaleDateString('pt-BR');
+                    const horaFormatada = dataHora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    
+                    const formatContent = (text) => text ? text.replace(/\n/g, '<br>') : 'Não informado.';
+
+                    return `
+                        <li class="atendimento-item">
+                            <div class="atendimento-header">
+                                <strong>${dataFormatada} às ${horaFormatada}</strong>
+                                <span>Por: ${at.profissional_nome || 'N/D'}</span>
+                            </div>
+                            <div class="atendimento-body">
+                                <div class="soap-section">
+                                    <h4>Subjetivo (S)</h4>
+                                    <p>${formatContent(at.subjetivo)}</p>
+                                </div>
+                                <div class="soap-section">
+                                    <h4>Objetivo (O)</h4>
+                                    <p>${formatContent(at.objetivo)}</p>
+                                </div>
+                                <div class="soap-section">
+                                    <h4>Avaliação (A)</h4>
+                                    <p>${formatContent(at.avaliacao)}</p>
+                                </div>
+                                <div class="soap-section">
+                                    <h4>Plano (P)</h4>
+                                    <p>${formatContent(at.plano)}</p>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                }).join('');
+            }
+
+            const patient = allPatients.find(p => p.id === patientId);
+            const patientName = patient ? patient.nome : '';
+
+            atendimentoRecordsModalContainer.innerHTML = `
+                <div class="modal-header">
+                    <h2>Registros de ${patientName}</h2>
+                    <button class="btn-icon" onclick="closeAtendimentoRecordsModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <ul class="atendimentos-list">${recordsHtml}</ul>
+                </div>
+            `;
+        });
+    }
+    
+    function closeAtendimentoRecordsModal() {
+        atendimentoRecordsModalContainer.classList.remove('visible');
+        atendimentoRecordsModalContainer.innerHTML = '';
+    }
 
     // ===== FUNÇÕES DE NOTIFICAÇÃO/LISTA =====
     function updateNotificationBell() {
@@ -498,6 +855,17 @@
               </div>
             </section>
             <hr style="margin:20px 0">
+            <!-- BOTÕES DE ATENDIMENTO -->
+            <section class="card-section" style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="btn btn-primary" style="width:100%;" onclick="openAtendimentoForm('${patient.id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+                    Atendimento Domiciliar
+                </button>
+                 <button class="btn btn-info" style="width:100%;" onclick="openAtendimentoRecords('${patient.id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    Ver Registro de Atendimentos
+                </button>
+            </section>
             <section class="card-section visits-section">
               <h4><span>Histórico de Visitas</span>
                 <button class="btn btn-info" onclick="openVisitModal('${patient.id}')">+ Visita</button>
@@ -1048,6 +1416,12 @@
     window.openPatientModal = openPatientModal;
     window.closePatientModal = closePatientModal;
     window.closeMoreOptionsModal = closeMoreOptionsModal;
+    window.openAtendimentoForm = openAtendimentoForm;
+    window.openAtendimentoRecords = openAtendimentoRecords;
+    window.closeAtendimentoModal = closeAtendimentoModal;
+    window.startSpeechRecognition = startSpeechRecognition;
+    window.closeAtendimentoRecordsModal = closeAtendimentoRecordsModal;
+
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       document.body.innerHTML = `<div style="padding:20px;text-align:center"><h2>CONFIGURAÇÃO INCOMPLETA</h2><p>Insira suas chaves do Supabase no código.</p></div>`;
