@@ -6,6 +6,8 @@
   <title>Gestão de Pacientes Mobile</title>
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- jsPDF for PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
@@ -109,7 +111,7 @@
     .form-group-with-icon { position: relative; }
     .mic-btn {
         position: absolute;
-        top: 32px; /* Adjusted for better alignment with label */
+        top: 32px; 
         right: 8px;
         padding: 5px;
         background: none;
@@ -129,8 +131,6 @@
       100% { transform: scale(1); }
     }
 
-
-    /* Simple Message Modal */
     .message-modal-overlay {
         position: fixed;
         top: 0;
@@ -169,7 +169,6 @@
       min-width: 100px;
     }
 
-    /* Atendimento Records Modal Styles */
     .atendimentos-list {
         list-style: none;
         padding: 0;
@@ -211,7 +210,7 @@
     .atendimento-body p {
         font-size: 15px;
         line-height: 1.5;
-        white-space: pre-wrap; /* Preserve line breaks entered in the textarea */
+        white-space: pre-wrap; 
         word-wrap: break-word;
     }
   </style>
@@ -243,6 +242,9 @@
         <div class="header-actions">
            <button id="header-add-patient-btn" class="btn-icon" title="Cadastrar Paciente">
              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="17" y1="11" x2="23" y2="11"></line></svg>
+           </button>
+           <button id="export-btn" class="btn-icon" title="Exportar Visitas Agendadas">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
            </button>
           <button id="notification-bell" class="btn-icon notification-bell">
             <svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.5V11C18 7.13 14.87 4 11 4S4 7.13 4 11V16.5L2 18.5V19.5H20V18.5L18 16.5ZM11 22C12.1 22 13 21.1 13 20H9C9 21.1 9.9 22 11 22Z"/></svg>
@@ -313,6 +315,7 @@
   <div id="more-options-modal" class="modal-overlay"></div>
   <div id="atendimento-modal" class="modal-overlay"></div>
   <div id="atendimento-records-modal" class="modal-overlay"></div>
+  <div id="export-modal" class="modal-overlay"></div>
 
   <script type="module">
     // ===== SUPABASE =====
@@ -344,12 +347,14 @@
     const moreOptionsModalContainer = document.getElementById('more-options-modal');
     const atendimentoModalContainer = document.getElementById('atendimento-modal');
     const atendimentoRecordsModalContainer = document.getElementById('atendimento-records-modal');
+    const exportModalContainer = document.getElementById('export-modal');
     const backToListBtn = document.getElementById('back-to-list-btn');
     const detailsHeaderTitle = document.getElementById('details-header-title');
     const editPatientBtn = document.getElementById('edit-patient-btn');
     const deletePatientBtn = document.getElementById('delete-patient-btn');
     const moreOptionsBtn = document.getElementById('more-options-btn');
     const headerAddPatientBtn = document.getElementById('header-add-patient-btn');
+    const exportBtn = document.getElementById('export-btn');
 
     // ===== ESTADO =====
     let allPatients = [];
@@ -695,6 +700,138 @@
         atendimentoRecordsModalContainer.classList.remove('visible');
         atendimentoRecordsModalContainer.innerHTML = '';
     }
+
+    // ===== FUNÇÃO DE EXPORTAÇÃO PDF =====
+    function openExportModal() {
+        exportModalContainer.innerHTML = `
+            <div class="modal-header">
+                <h2>Exportar Visitas Agendadas</h2>
+                <button class="btn-icon" onclick="closeExportModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px;">Selecione os filtros para exportar as visitas agendadas.</p>
+                <div class="form-group">
+                    <label for="export-team-select">Equipe</label>
+                    <select id="export-team-select">
+                        <option value="71">Equipe 71</option>
+                        <option value="72">Equipe 72</option>
+                        <option value="76">Equipe 76</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="start-date">Data de Início</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="form-group">
+                    <label for="end-date">Data de Fim</label>
+                    <input type="date" id="end-date">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeExportModal()">Cancelar</button>
+                <button id="generate-pdf-btn" class="btn btn-success">Gerar PDF</button>
+            </div>
+        `;
+        exportModalContainer.classList.add('visible');
+        document.getElementById('export-team-select').value = currentTeam; // Pre-select current team
+        document.getElementById('generate-pdf-btn').addEventListener('click', handleExport);
+    }
+
+    function closeExportModal() {
+        exportModalContainer.classList.remove('visible');
+        exportModalContainer.innerHTML = '';
+    }
+
+    async function handleExport() {
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        const selectedTeam = document.getElementById('export-team-select').value;
+        const generateBtn = document.getElementById('generate-pdf-btn');
+
+        if (!startDate || !endDate) {
+            showMessageModal('Por favor, selecione a data de início e a data de fim.');
+            return;
+        }
+        if (new Date(startDate) > new Date(endDate)) {
+            showMessageModal('A data de início não pode ser posterior à data de fim.');
+            return;
+        }
+
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Gerando...';
+
+        try {
+            const { data, error } = await db
+                .from('pacientes')
+                .select('nome, endereco, data_proxima_visita, profissional_proxima_visita')
+                .eq('equipe', selectedTeam)
+                .gte('data_proxima_visita', startDate)
+                .lte('data_proxima_visita', endDate)
+                .order('data_proxima_visita', { ascending: true });
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                showMessageModal('Nenhuma visita agendada encontrada para o período e equipe selecionados.');
+                return;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const pageHeight = doc.internal.pageSize.height;
+            let y = 20;
+
+            doc.setFontSize(16);
+            doc.text('Relatório de Visitas Domiciliares Agendadas', 105, y, { align: 'center' });
+            y += 10;
+            doc.setFontSize(12);
+            const startDateFormatted = new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR');
+            const endDateFormatted = new Date(endDate + 'T00:00:00').toLocaleDateString('pt-BR');
+            doc.text(`Equipe: ${selectedTeam} | Período: ${startDateFormatted} a ${endDateFormatted}`, 105, y, { align: 'center' });
+            y += 15;
+
+            doc.setLineWidth(0.5);
+            doc.line(10, y-5, 200, y-5);
+
+            data.forEach(patient => {
+                if (y > pageHeight - 30) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                const visitDate = new Date(patient.data_proxima_visita + 'T00:00:00').toLocaleDateString('pt-BR');
+                
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text(`Paciente: ${patient.nome || 'Não informado'}`, 10, y);
+                y += 7;
+
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Data da Visita: ${visitDate}`, 15, y);
+                y += 6;
+                doc.text(`Profissional: ${patient.profissional_proxima_visita || 'Não definido'}`, 15, y);
+                y += 6;
+                doc.text(`Endereço: ${patient.endereco || 'Não informado'}`, 15, y);
+                y += 10;
+                doc.line(10, y-5, 200, y-5);
+            });
+            
+            const fileName = `relatorio_visitas_equipe_${selectedTeam}_${startDate}_a_${endDate}.pdf`;
+            doc.save(fileName);
+
+        } catch (err) {
+            console.error('Erro ao exportar dados para PDF:', err);
+            showMessageModal('Ocorreu um erro ao gerar o relatório PDF. Tente novamente.');
+        } finally {
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Gerar PDF';
+            closeExportModal();
+        }
+    }
+
 
     // ===== FUNÇÕES DE NOTIFICAÇÃO/LISTA =====
     function updateNotificationBell() {
@@ -1198,7 +1335,6 @@
             saveButton.disabled = true;
             saveButton.textContent = 'Salvando...';
 
-            // Check for existing patient with the same CNS
             const { data: existingPatient, error: checkError } = await db
                 .from('pacientes')
                 .select('*') 
@@ -1214,20 +1350,16 @@
             }
 
             if (isEditing) {
-                // --- LÓGICA DE EDIÇÃO ---
                 if (existingPatient && existingPatient.id !== patientId) {
-                    // Trying to change CNS to one that already exists for another patient
                     showConfirmationModal(
                         `O CNS informado já pertence a(o) paciente ${existingPatient.nome}. Deseja que os dados atuais sobrescrevam o cadastro dele? O paciente que você estava editando (${patient.nome}) será removido.`,
                         async () => {
-                            // 1. Update the existing patient
                             const { error: updateError } = await db.from('pacientes').update(patientData).eq('id', existingPatient.id);
                             if (updateError) {
                                 showMessageModal("Ocorreu um erro ao sobrescrever os dados do paciente.");
                                 console.error("Erro ao sobrescrever:", updateError);
                                 return;
                             }
-                            // 2. Delete the old patient record
                             const { error: deleteError } = await db.from('pacientes').delete().eq('id', patientId);
                             if (deleteError) {
                                 showMessageModal("Dados sobrescritos, mas ocorreu um erro ao remover o cadastro antigo. Por favor, remova-o manualmente.");
@@ -1242,7 +1374,6 @@
                     saveButton.disabled = false;
                     saveButton.textContent = 'Salvar';
                 } else {
-                    // Normal update, no CNS conflict
                     const { error: updateError } = await db.from('pacientes').update(patientData).eq('id', patientId);
                     if (updateError) {
                          console.error("Erro ao atualizar paciente", updateError);
@@ -1256,7 +1387,6 @@
                     }
                 }
             } else {
-                // --- LÓGICA DE CRIAÇÃO ---
                 if (existingPatient) {
                     showConfirmationModal(
                         `Já existe um paciente (${existingPatient.nome}) com este CNS. Deseja sobrescrever os dados dele com as novas informações?`,
@@ -1421,6 +1551,8 @@
     window.closeAtendimentoModal = closeAtendimentoModal;
     window.startSpeechRecognition = startSpeechRecognition;
     window.closeAtendimentoRecordsModal = closeAtendimentoRecordsModal;
+    window.openExportModal = openExportModal;
+    window.closeExportModal = closeExportModal;
 
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -1492,6 +1624,7 @@
         }
       });
       moreOptionsBtn.addEventListener('click', openMoreOptionsModal);
+      exportBtn.addEventListener('click', openExportModal);
     }
   </script>
 </body>
